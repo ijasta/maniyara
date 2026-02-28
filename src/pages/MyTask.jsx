@@ -23,7 +23,7 @@ function MyTaskContent() {
 
   const handleFile = e => {
     const f = e.target.files[0]; if (!f) return
-    if (f.size > 60*1024*1024) { toast('Max 60MB','warn'); return }
+    if (f.size > 50*1024*1024) { toast('Max 50MB','warn'); return }
     setProof({ file:f, url:URL.createObjectURL(f) })
   }
 
