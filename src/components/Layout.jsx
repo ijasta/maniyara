@@ -37,7 +37,7 @@ export default function Layout() {
     { to:'/', icon:'⌂', label:'Home',   short:'Home',  end:true },
     { to:'/mytask',      icon:'✦', label:'My Task', short:'Task' },
     { to:'/members',     icon:'◈', label:'Members', short:'Crew' },
-    { to:'/leaderboard', icon:'◉', label:'Board',   short:'Board' },
+    { to:'/expenses',    icon:'💸', label:'Expenses', short:'Money' },
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
   ]
 
