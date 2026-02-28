@@ -3,7 +3,7 @@ import {
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
   getTasks, addTask, updateTask, deleteTask,
   getCurrentAssignments, forceRotate, swapTasks,
-  getSettings, updateSettings, getLogs, buildWALink,
+  getSettings, updateSettings, getLogs, buildWALink, clearAllAssignments, clearWeekAssignments, resetWeekDoneStatus,
   COLORS, AVATARS
 } from '../lib/supabase'
 import { Avatar, Toggle, ScoreBar, SecHead, Btn, ToastProvider, useToast, inp } from '../components/UI'
@@ -294,6 +294,36 @@ function AdminContent() {
           <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14}}>
             <SwapPanel members={members} assigns={assigns} week={week} toast={toast} onDone={load}/>
           </div>
+
+          {/* Clear Assignments */}
+          <SecHead title="Clear Assignments"/>
+          <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14,display:'flex',flexDirection:'column',gap:10}}>
+            <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:4}}>
+              ⚠️ Use these to reset task progress for the week without rotating to a new week.
+            </div>
+
+            {/* Reset done status only */}
+            <Btn variant="warn" full onClick={async()=>{
+              if(!confirm(`Reset all DONE status for Week ${week}? Tasks stay assigned but marked as not done again.`)) return
+              try { await resetWeekDoneStatus(week); toast(`Week ${week} done-status reset ✅`); load() }
+              catch(e) { toast('Failed: '+e.message,'error') }
+            }}>🔄 Reset Done Status — Week {week}</Btn>
+
+            {/* Clear current week only */}
+            <Btn variant="danger" full onClick={async()=>{
+              if(!confirm(`Delete ALL assignments for Week ${week}? Members will have no tasks until you rotate again.`)) return
+              try { await clearWeekAssignments(week); toast(`Week ${week} assignments cleared 🗑️`,'warn'); load() }
+              catch(e) { toast('Failed: '+e.message,'error') }
+            }}>🗑️ Clear Week {week} Assignments</Btn>
+
+            {/* Nuclear — clear all weeks */}
+            <Btn variant="danger" full onClick={async()=>{
+              if(!confirm('⚠️ DELETE ALL assignments across ALL weeks? This cannot be undone!')) return
+              if(!confirm('Are you absolutely sure? All task history will be gone.')) return
+              try { await clearAllAssignments(); toast('All assignments deleted 🗑️','warn'); load() }
+              catch(e) { toast('Failed: '+e.message,'error') }
+            }}>☢️ Clear ALL Assignments (All Weeks)</Btn>
+          </div>
         </div>
       )}
 
@@ -371,6 +401,17 @@ function AdminContent() {
             <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#FF6B6B',textTransform:'uppercase',marginBottom:13}}>🛠️ Danger Zone</div>
             <div style={{display:'flex',flexDirection:'column',gap:9}}>
               <Btn variant="danger" full onClick={()=>{if(confirm('Reset ALL member scores to 0?')) {members.forEach(m=>updateMember(m.id,{score:0,streak:0}));toast('All scores reset','warn');load()}}}>🔄 Reset All Scores</Btn>
+              <Btn variant="danger" full onClick={async()=>{
+                if(!confirm(`Clear all assignments for current Week ${week}?`)) return
+                try{await clearWeekAssignments(week);toast('Week assignments cleared 🗑️','warn');load()}
+                catch(e){toast('Failed: '+e.message,'error')}
+              }}>🗑️ Clear This Week's Assignments</Btn>
+              <Btn variant="danger" full onClick={async()=>{
+                if(!confirm('Delete ALL assignments across ALL weeks? Cannot be undone!')) return
+                if(!confirm('Final confirmation — are you sure?')) return
+                try{await clearAllAssignments();toast('All assignments deleted','warn');load()}
+                catch(e){toast('Failed: '+e.message,'error')}
+              }}>☢️ Clear ALL Assignments Ever</Btn>
               <Btn variant="ghost" full onClick={()=>{const d=JSON.stringify({members,tasks,assigns,settings},null,2);const a=document.createElement('a');a.href='data:text/json,'+encodeURIComponent(d);a.download='maniyara-backup.json';a.click();toast('Exported 📤')}}>📤 Export Data (JSON)</Btn>
             </div>
           </div>
