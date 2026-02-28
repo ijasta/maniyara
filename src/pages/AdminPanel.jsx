@@ -40,6 +40,7 @@ function AdminContent() {
 
   const TABS = [
     { id:'assign',   label:'📋 Assign Tasks', badge: pending.length || null },
+    { id:'controls',  label:'🎛️ Site Controls' },
     { id:'approvals',label:'🔔 Approvals', badge: pending.length || null },
     { id:'members',  label:'👥 Members' },
     { id:'tasks',    label:'✏️ Edit Tasks' },
@@ -67,6 +68,11 @@ function AdminContent() {
           </button>
         ))}
       </div>
+
+      {/* ── SITE CONTROLS ── */}
+      {tab==='controls' && (
+        <SiteControlsTab settings={settings} toast={toast} onDone={load}/>
+      )}
 
       {/* ══════════════════════════════════════════
           ASSIGN TASKS TAB — main new feature
@@ -239,27 +245,8 @@ function AdminContent() {
       )}
 
       {/* ── SETTINGS ── */}
-      {tab==='settings' && setSt && (
-        <div>
-          <SecHead title="App Settings"/>
-          <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:12}}>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#7DF9AA',textTransform:'uppercase',marginBottom:13}}>🏠 House Info</div>
-            {[['House Name','house_name','text',settings?.house_name],['App Tagline','app_tagline','text',settings?.app_tagline]].map(([lb,key,type,val])=>(
-              <div key={key} style={{marginBottom:12}}>
-                <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
-                <input type={type} defaultValue={val} onBlur={async e=>{await updateSettings({[key]:e.target.value});toast(`${lb} saved ✅`)}} style={{...inp,padding:'10px 13px'}}/>
-              </div>
-            ))}
-          </div>
-          <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#FF6B6B',textTransform:'uppercase',marginBottom:13}}>🛠️ Danger Zone</div>
-            <div style={{display:'flex',flexDirection:'column',gap:9}}>
-              <Btn variant="danger" full onClick={async()=>{if(!confirm(`Clear all assignments for Week ${week}?`)) return;await clearWeekAssignments(week);toast('Week cleared','warn');load()}}>🗑️ Clear This Week's Tasks</Btn>
-              <Btn variant="danger" full onClick={async()=>{if(!confirm('Delete ALL assignments ever?')) return;if(!confirm('Are you sure?')) return;await clearAllAssignments();toast('All cleared','warn');load()}}>☢️ Clear ALL Assignments Ever</Btn>
-              <Btn variant="ghost" full onClick={()=>{const d=JSON.stringify({members,tasks,assigns,settings},null,2);const a=document.createElement('a');a.href='data:text/json,'+encodeURIComponent(d);a.download='maniyara-backup.json';a.click();toast('Exported 📤')}}>📤 Export Data (JSON)</Btn>
-            </div>
-          </div>
-        </div>
+      {tab==='settings' && (
+        <SettingsTab settings={settings} week={week} toast={toast} onDone={load} members={members} assigns={assigns} tasks={tasks}/>
       )}
 
       {/* ── LOGS ── */}
@@ -517,6 +504,170 @@ function AddTaskForm({ onAdd }) {
 }
 
 
+
+// ══════════════════════════════════════════════════════════
+// SITE CONTROLS TAB
+// ══════════════════════════════════════════════════════════
+function SiteControlsTab({ settings, toast, onDone }) {
+  const [form,   setForm]   = useState({
+    maintenance_mode:    settings?.maintenance_mode    ?? false,
+    maintenance_message: settings?.maintenance_message ?? "We are performing maintenance. Back soon! 🔧",
+    page_dashboard:      settings?.page_dashboard      ?? true,
+    page_mytask:         settings?.page_mytask         ?? true,
+    page_members:        settings?.page_members        ?? true,
+    page_expenses:       settings?.page_expenses       ?? true,
+    page_fund:           settings?.page_fund           ?? true,
+  })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm(f => ({...f, [k]: v}))
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await updateSettings(form)
+      toast('Site controls saved ✅')
+      onDone()
+    } catch(e) { toast('Failed: '+e.message, 'error') }
+    finally { setSaving(false) }
+  }
+
+  const PAGES = [
+    { key:'page_dashboard', label:'🏠 Home / Dashboard',    desc:'Main task overview page' },
+    { key:'page_mytask',    label:'✦ My Task',              desc:'Personal task & upload page' },
+    { key:'page_members',   label:'◈ Members / Crew',       desc:'Who done / pending page' },
+    { key:'page_expenses',  label:'💸 Expenses',            desc:'Split bill tracker' },
+    { key:'page_fund',      label:'🏦 Common Fund',         desc:'Shared house fund page' },
+  ]
+
+  return (
+    <div>
+      {/* ── MAINTENANCE MODE ── */}
+      <div style={{background: form.maintenance_mode ? 'rgba(255,107,107,.08)' : 'rgba(255,217,61,.05)',
+        border:`2px solid ${form.maintenance_mode ? 'rgba(255,107,107,.35)' : 'rgba(255,217,61,.2)'}`,
+        borderRadius:14, padding:16, marginBottom:18}}>
+
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
+          <div>
+            <div style={{fontFamily:'Orbitron,monospace', fontSize:13, fontWeight:800,
+              color: form.maintenance_mode ? '#FF6B6B' : '#FFD93D', letterSpacing:1}}>
+              {form.maintenance_mode ? '🚨 MAINTENANCE ON' : '✅ SITE LIVE'}
+            </div>
+            <div style={{fontSize:11, color:'#8890b0', marginTop:3}}>
+              {form.maintenance_mode ? 'Members see maintenance page' : 'All members can access the site'}
+            </div>
+          </div>
+          {/* Big toggle */}
+          <div onClick={()=>set('maintenance_mode', !form.maintenance_mode)}
+            style={{width:60, height:32, borderRadius:99, cursor:'pointer', position:'relative', transition:'background .2s',
+              background: form.maintenance_mode ? '#FF6B6B' : 'rgba(255,255,255,.1)',
+              border:`2px solid ${form.maintenance_mode ? '#FF6B6B' : 'rgba(255,255,255,.15)'}`,
+              boxShadow: form.maintenance_mode ? '0 0 16px rgba(255,107,107,.4)' : 'none'}}>
+            <div style={{position:'absolute', top:3, transition:'left .2s',
+              left: form.maintenance_mode ? 28 : 3,
+              width:22, height:22, borderRadius:'50%',
+              background: form.maintenance_mode ? '#fff' : 'rgba(255,255,255,.4)'}}/>
+          </div>
+        </div>
+
+        {/* Maintenance message */}
+        <div>
+          <label style={{display:'block', fontSize:10, fontWeight:700, color:'#4a5070',
+            textTransform:'uppercase', letterSpacing:'.09em', marginBottom:6}}>
+            Maintenance Message (shown to members)
+          </label>
+          <textarea value={form.maintenance_message}
+            onChange={e=>set('maintenance_message', e.target.value)}
+            rows={3} style={{...inp, width:'100%', resize:'vertical', fontSize:'14px', lineHeight:1.6}}
+            placeholder="We are performing maintenance. Back soon! 🔧"/>
+        </div>
+
+        {form.maintenance_mode && (
+          <div style={{marginTop:10, padding:'9px 12px', borderRadius:8,
+            background:'rgba(255,107,107,.1)', border:'1px solid rgba(255,107,107,.2)'}}>
+            <div style={{fontSize:12, color:'#FF6B6B', fontWeight:700}}>
+              ⚠️ Site is currently in maintenance mode. Members cannot access the site.
+              Only you (admin) can bypass it.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── PAGE VISIBILITY ── */}
+      <div style={{fontFamily:'Orbitron,monospace', fontSize:10, fontWeight:700,
+        letterSpacing:2, color:'#7DF9AA', textTransform:'uppercase', marginBottom:12}}>
+        📱 Page Visibility
+      </div>
+      <div style={{fontSize:12, color:'#8890b0', marginBottom:14, lineHeight:1.6}}>
+        Toggle which pages are visible to members in the navigation. Disabled pages are hidden from the nav bar and redirect home if accessed directly.
+      </div>
+
+      <div style={{display:'flex', flexDirection:'column', gap:9, marginBottom:20}}>
+        {PAGES.map(({ key, label, desc }) => {
+          const isOn = form[key] !== false
+          return (
+            <div key={key} style={{background:'#0d0e1a',
+              border:`1px solid ${isOn ? 'rgba(125,249,170,.2)' : 'rgba(255,255,255,.06)'}`,
+              borderRadius:12, padding:'13px 14px',
+              display:'flex', alignItems:'center', gap:13,
+              transition:'border-color .2s'}}>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontWeight:700, fontSize:14, color: isOn ? '#E8F0FF' : '#4a5070',
+                  transition:'color .2s'}}>{label}</div>
+                <div style={{fontSize:11, color:'#4a5070', marginTop:2}}>{desc}</div>
+              </div>
+              {/* Status badge */}
+              <div style={{fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:99, flexShrink:0,
+                background: isOn ? 'rgba(125,249,170,.1)' : 'rgba(255,107,107,.08)',
+                border:`1px solid ${isOn ? 'rgba(125,249,170,.25)' : 'rgba(255,107,107,.2)'}`,
+                color: isOn ? '#7DF9AA' : '#FF6B6B'}}>
+                {isOn ? 'VISIBLE' : 'HIDDEN'}
+              </div>
+              {/* Toggle */}
+              <div onClick={()=>set(key, !isOn)}
+                style={{width:50, height:27, borderRadius:99, cursor:'pointer', position:'relative',
+                  flexShrink:0, transition:'background .2s',
+                  background: isOn ? '#7DF9AA' : 'rgba(255,255,255,.08)',
+                  boxShadow: isOn ? '0 0 12px rgba(125,249,170,.3)' : 'none'}}>
+                <div style={{position:'absolute', top:3, transition:'left .2s',
+                  left: isOn ? 24 : 3,
+                  width:21, height:21, borderRadius:'50%',
+                  background: isOn ? '#070810' : 'rgba(255,255,255,.3)'}}/>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Quick actions */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:9, marginBottom:18}}>
+        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:true, page_members:true, page_expenses:true, page_fund:true}))}
+          style={{padding:'10px', borderRadius:9, fontFamily:'Rajdhani,sans-serif', fontWeight:700,
+            fontSize:12, cursor:'pointer', border:'1px solid rgba(125,249,170,.2)',
+            background:'rgba(125,249,170,.07)', color:'#7DF9AA', letterSpacing:'.05em'}}>
+          ✅ Enable All Pages
+        </button>
+        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:false, page_members:false, page_expenses:false, page_fund:false}))}
+          style={{padding:'10px', borderRadius:9, fontFamily:'Rajdhani,sans-serif', fontWeight:700,
+            fontSize:12, cursor:'pointer', border:'1px solid rgba(255,107,107,.2)',
+            background:'rgba(255,107,107,.07)', color:'#FF6B6B', letterSpacing:'.05em'}}>
+          🚫 Hide All Except Home
+        </button>
+      </div>
+
+      {/* Save button */}
+      <button onClick={save} disabled={saving}
+        style={{width:'100%', padding:16, borderRadius:12, fontFamily:'Rajdhani,sans-serif',
+          fontWeight:800, fontSize:15, cursor:'pointer', border:'none',
+          background: saving ? '#1a2030' : 'linear-gradient(135deg,#7DF9AA,#00D4AA)',
+          color:'#070810', letterSpacing:'.08em',
+          boxShadow:'0 4px 20px rgba(125,249,170,.25)',
+          opacity: saving ? 0.6 : 1, transition:'all .15s'}}>
+        {saving ? '⏳ Saving...' : '💾 Save Site Controls'}
+      </button>
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════
 // EXPENSES ADMIN TAB
 // ══════════════════════════════════════════════════════════
@@ -759,6 +910,144 @@ function ExpensesAdminTab({ toast, members }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+
+// ══════════════════════════════════════════════════════════
+// SETTINGS TAB
+// ══════════════════════════════════════════════════════════
+function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks }) {
+  const [maint,    setMaint]    = useState(settings?.maintenance_mode || false)
+  const [maintMsg, setMaintMsg] = useState(settings?.maintenance_msg  || 'We are performing scheduled maintenance. Back soon! 🔧')
+  const [maintEta, setMaintEta] = useState(settings?.maintenance_eta  || '')
+  const [showExp,  setShowExp]  = useState(settings?.show_expenses !== false)
+  const [showFund, setShowFund] = useState(settings?.show_fund     !== false)
+  const [saving,   setSaving]   = useState(false)
+
+  const save = async (updates) => {
+    setSaving(true)
+    try { await updateSettings(updates); toast('Saved ✅'); onDone() }
+    catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      {/* ── SITE VISIBILITY ── */}
+      <SecHead title="Page Visibility"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        <div style={{fontSize:11,color:'#8890b0',marginBottom:14,lineHeight:1.6}}>
+          Toggle which pages are visible to members. Hidden pages disappear from the nav bar instantly.
+        </div>
+
+        {/* Expenses toggle */}
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'13px 0',borderBottom:'1px solid rgba(125,249,170,.06)'}}>
+          <div style={{fontSize:28}}>💸</div>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:14}}>Expenses Page</div>
+            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>Show/hide the shared expenses tracker</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:11,fontWeight:700,color:showExp?'#7DF9AA':'#FF6B6B'}}>{showExp?'VISIBLE':'HIDDEN'}</span>
+            <Toggle value={showExp} onChange={async v=>{ setShowExp(v); await save({ show_expenses: v }) }}/>
+          </div>
+        </div>
+
+        {/* Fund toggle */}
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'13px 0'}}>
+          <div style={{fontSize:28}}>🏦</div>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:14}}>Common Fund Page</div>
+            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>Show/hide the common fund tracker</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:11,fontWeight:700,color:showFund?'#7DF9AA':'#FF6B6B'}}>{showFund?'VISIBLE':'HIDDEN'}</span>
+            <Toggle value={showFund} onChange={async v=>{ setShowFund(v); await save({ show_fund: v }) }}/>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MAINTENANCE MODE ── */}
+      <SecHead title="Maintenance Mode"/>
+      <div style={{background:maint?'rgba(255,154,60,.07)':'#0d0e1a',border:`1px solid ${maint?'rgba(255,154,60,.3)':'rgba(255,154,60,.12)'}`,borderRadius:13,padding:14,marginBottom:14,transition:'all .2s'}}>
+
+        {/* Big toggle */}
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: maint ? 16 : 0}}>
+          <div style={{fontSize:32}}>🔧</div>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:15}}>Maintenance Mode</div>
+            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
+              {maint ? '⚠️ Site is OFFLINE for members right now' : 'Members can access the site normally'}
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:11,fontWeight:700,color:maint?'#FF9A3C':'#7DF9AA'}}>{maint?'ON':'OFF'}</span>
+            <Toggle value={maint} onChange={async v=>{
+              if (v && !confirm('Enable maintenance mode? Members will see a maintenance page immediately!')) return
+              setMaint(v)
+              await save({ maintenance_mode: v })
+              toast(v ? '🔧 Maintenance mode ON — members see offline page' : '✅ Site is back online for members')
+            }}/>
+          </div>
+        </div>
+
+        {/* Maintenance settings — show when on */}
+        {maint && (
+          <div style={{borderTop:'1px solid rgba(255,154,60,.15)',paddingTop:14}}>
+            <div style={{marginBottom:11}}>
+              <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Message shown to members</label>
+              <textarea
+                value={maintMsg} onChange={e=>setMaintMsg(e.target.value)}
+                rows={3} style={{...inp, width:'100%', resize:'vertical'}}
+                placeholder="We are performing maintenance. Back soon!"/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Estimated time (optional)</label>
+              <input value={maintEta} onChange={e=>setMaintEta(e.target.value)}
+                style={{...inp}} placeholder="e.g. Back in 30 minutes, Tonight by 10 PM..."/>
+            </div>
+            <Btn full loading={saving} onClick={()=>save({ maintenance_msg: maintMsg, maintenance_eta: maintEta })}
+              style={{background:'linear-gradient(135deg,#FF9A3C,#FFD93D)',color:'#070810'}}>
+              💾 Save Maintenance Message
+            </Btn>
+          </div>
+        )}
+      </div>
+
+      {/* Preview of maintenance page */}
+      {maint && (
+        <div style={{background:'rgba(255,154,60,.05)',border:'1px solid rgba(255,154,60,.15)',borderRadius:13,padding:'12px 14px',marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#FF9A3C',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>👁️ Member Preview</div>
+          <div style={{fontSize:13,color:'#8890b0',lineHeight:1.7}}>
+            Members will see: <span style={{color:'#FFD93D',fontWeight:700}}>"{maintMsg}"</span>
+            {maintEta && <span> with ETA: <span style={{color:'#FFD93D',fontWeight:700}}>"{maintEta}"</span></span>}
+          </div>
+        </div>
+      )}
+
+      {/* ── HOUSE INFO ── */}
+      <SecHead title="House Info"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        {[['House Name','house_name',settings?.house_name],['App Tagline','app_tagline',settings?.app_tagline]].map(([lb,key,val])=>(
+          <div key={key} style={{marginBottom:12}}>
+            <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
+            <input type="text" defaultValue={val} onBlur={async e=>{ await save({[key]:e.target.value}) }}
+              style={{...inp,padding:'10px 13px'}}/>
+          </div>
+        ))}
+      </div>
+
+      {/* ── DANGER ZONE ── */}
+      <SecHead title="Danger Zone"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
+        <div style={{display:'flex',flexDirection:'column',gap:9}}>
+          <Btn variant="danger" full onClick={async()=>{if(!confirm(`Clear all assignments for Week ${week}?`)) return;await clearWeekAssignments(week);toast('Week cleared','warn');onDone()}}>🗑️ Clear This Week's Tasks</Btn>
+          <Btn variant="danger" full onClick={async()=>{if(!confirm('Delete ALL assignments ever?')) return;if(!confirm('Are you sure?')) return;await clearAllAssignments();toast('All cleared','warn');onDone()}}>☢️ Clear ALL Assignments Ever</Btn>
+          <Btn variant="ghost" full onClick={()=>{const d=JSON.stringify({members,tasks,assigns,settings},null,2);const a=document.createElement('a');a.href='data:text/json,'+encodeURIComponent(d);a.download='maniyara-backup.json';a.click();toast('Exported 📤')}}>📤 Export Data (JSON)</Btn>
+        </div>
+      </div>
     </div>
   )
 }
