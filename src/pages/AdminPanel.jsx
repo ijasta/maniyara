@@ -5,6 +5,7 @@ import {
   getCurrentAssignments, adminAssignTasks, rotateToNextWeek, deleteAssignment,
   getSettings, updateSettings, getLogs, buildWALink,
   clearAllAssignments, clearWeekAssignments, resetWeekDoneStatus,
+  getExpenses, deleteExpense, markSplitPaid, markSplitUnpaid,
   COLORS, AVATARS
 } from '../lib/supabase'
 import { Avatar, Toggle, Btn, SecHead, ToastProvider, useToast, inp } from '../components/UI'
@@ -44,6 +45,7 @@ function AdminContent() {
     { id:'tasks',    label:'✏️ Edit Tasks' },
     { id:'whatsapp', label:'📱 WhatsApp' },
     { id:'settings', label:'⚙️ Settings' },
+    { id:'expenses', label:'💸 Expenses' },
     { id:'logs',     label:'📜 Logs' },
   ]
 
@@ -206,6 +208,11 @@ function AdminContent() {
           ))}
           <AddTaskForm onAdd={()=>{toast('Task added ✅');load()}}/>
         </div>
+      )}
+
+      {/* ── EXPENSES ── */}
+      {tab==='expenses' && (
+        <ExpensesAdminTab toast={toast} members={members}/>
       )}
 
       {/* ── WHATSAPP ── */}
@@ -505,6 +512,253 @@ function AddTaskForm({ onAdd }) {
         catch(e){toast('Failed: '+e.message,'error')}
         finally{setL(false)}
       }}>+ Add Task</Btn>
+    </div>
+  )
+}
+
+
+// ══════════════════════════════════════════════════════════
+// EXPENSES ADMIN TAB
+// ══════════════════════════════════════════════════════════
+const CATS = [
+  { id:'groceries',   label:'Groceries',   emoji:'🛒' },
+  { id:'electricity', label:'Electricity', emoji:'💡' },
+  { id:'water',       label:'Water',       emoji:'🌊' },
+  { id:'food',        label:'Food/Order',  emoji:'🍕' },
+  { id:'internet',    label:'Internet',    emoji:'📶' },
+  { id:'rent',        label:'Rent',        emoji:'🏠' },
+  { id:'cleaning',    label:'Cleaning',    emoji:'🧹' },
+  { id:'other',       label:'Other',       emoji:'💸' },
+]
+const catMeta = id => CATS.find(c=>c.id===id) || CATS[7]
+const fmtAmt  = n => '₹' + Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})
+
+function ExpensesAdminTab({ toast, members }) {
+  const [expenses, setExpenses] = useState([])
+  const [loading,  setL]        = useState(true)
+  const [expandId, setExpandId] = useState(null)
+  const [editId,   setEditId]   = useState(null)
+  const [editData, setEditData] = useState({})
+  const [saving,   setSaving]   = useState(false)
+
+  useEffect(() => { loadExp() }, [])
+
+  async function loadExp() {
+    setL(true)
+    try { setExpenses(await getExpenses()) }
+    catch(e) { toast('Failed to load: '+e.message,'error') }
+    finally { setL(false) }
+  }
+
+  const totalSpent = expenses.reduce((s,e)=>s+Number(e.amount),0)
+  const totalUnsettled = expenses.reduce((s,e)=>{
+    const unpaid = (e.expense_splits||[]).filter(sp=>!sp.paid).reduce((a,sp)=>a+Number(sp.amount),0)
+    return s + unpaid
+  },0)
+
+  const startEdit = (exp) => {
+    setEditId(exp.id)
+    setEditData({ title: exp.title, amount: exp.amount, category: exp.category, note: exp.note||'' })
+    setExpandId(exp.id)
+  }
+
+  const saveEdit = async (expId) => {
+    if (!editData.title?.trim()) { toast('Title required','warn'); return }
+    if (!editData.amount || +editData.amount <= 0) { toast('Valid amount required','warn'); return }
+    setSaving(true)
+    try {
+      const { error } = await (await import('../lib/supabase')).supabase
+        .from('expenses')
+        .update({ title: editData.title.trim(), amount: +editData.amount, category: editData.category, note: editData.note })
+        .eq('id', expId)
+      if (error) throw error
+      toast('Expense updated ✅')
+      setEditId(null)
+      loadExp()
+    } catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setSaving(false) }
+  }
+
+  const delExp = async (exp) => {
+    if (!confirm(`Delete "${exp.title}" (${fmtAmt(exp.amount)})?`)) return
+    try { await deleteExpense(exp.id); toast('Deleted 🗑️','warn'); loadExp() }
+    catch(e) { toast('Failed: '+e.message,'error') }
+  }
+
+  const clearAll = async () => {
+    if (!confirm('Delete ALL expenses? This cannot be undone!')) return
+    if (!confirm('Final confirmation — all expense history will be gone.')) return
+    try {
+      // Delete all expense_splits first, then expenses
+      const { supabase: sb } = await import('../lib/supabase')
+      await sb.from('expense_splits').delete().gt('created_at','2000-01-01')
+      await sb.from('expenses').delete().gt('created_at','2000-01-01')
+      toast('All expenses cleared ☢️','warn')
+      loadExp()
+    } catch(e) { toast('Failed: '+e.message,'error') }
+  }
+
+  const clearSettled = async () => {
+    if (!confirm('Delete all fully settled expenses?')) return
+    try {
+      const settled = expenses.filter(e => (e.expense_splits||[]).every(s=>s.paid))
+      const { supabase: sb } = await import('../lib/supabase')
+      for (const e of settled) {
+        await sb.from('expense_splits').delete().eq('expense_id', e.id)
+        await sb.from('expenses').delete().eq('id', e.id)
+      }
+      toast(`${settled.length} settled expenses cleared ✅`)
+      loadExp()
+    } catch(e) { toast('Failed: '+e.message,'error') }
+  }
+
+  if (loading) return <div style={{color:'#8890b0',padding:40,textAlign:'center'}}>Loading expenses...</div>
+
+  return (
+    <div>
+      {/* Stats strip */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:9,marginBottom:14}}>
+        {[
+          ['📊','Total Bills', expenses.length,'#4D96FF'],
+          ['💰','Total Spent', fmtAmt(totalSpent),'#7DF9AA'],
+          ['⏳','Unsettled',   fmtAmt(totalUnsettled),'#FF6B6B'],
+        ].map(([ic,lb,val,c])=>(
+          <div key={lb} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.07)',borderRadius:13,padding:'12px 8px',textAlign:'center'}}>
+            <span style={{fontSize:20,display:'block',marginBottom:4}}>{ic}</span>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,color:c,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{val}</div>
+            <div style={{fontSize:9,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.07em',marginTop:3,fontWeight:700}}>{lb}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bulk action buttons */}
+      <div style={{display:'flex',gap:9,marginBottom:16}}>
+        <button onClick={clearSettled}
+          style={{flex:1,padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',
+            border:'1px solid rgba(255,217,61,.25)',background:'rgba(255,217,61,.07)',color:'#FFD93D',letterSpacing:'.05em'}}>
+          🧹 Clear Settled
+        </button>
+        <button onClick={clearAll}
+          style={{flex:1,padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',
+            border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',letterSpacing:'.05em'}}>
+          ☢️ Clear ALL
+        </button>
+      </div>
+
+      <SecHead title="All Expenses" badge={`${expenses.length} total`}/>
+
+      {expenses.length === 0 ? (
+        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.07)',borderRadius:13,padding:'50px 20px',textAlign:'center',color:'#4a5070'}}>
+          <div style={{fontSize:44,marginBottom:10}}>💸</div>
+          <div>No expenses recorded yet.</div>
+        </div>
+      ) : expenses.map(exp => {
+        const cat    = catMeta(exp.category)
+        const isExp  = expandId === exp.id
+        const isEdit = editId   === exp.id
+        const payer  = exp.paid_by_member
+        const splits = exp.expense_splits || []
+        const unpaid = splits.filter(s=>!s.paid).length
+        const allPaid= unpaid === 0
+
+        return (
+          <div key={exp.id} style={{background:'#0d0e1a',border:`1px solid ${allPaid?'rgba(125,249,170,.2)':'rgba(125,249,170,.08)'}`,borderRadius:13,marginBottom:10,overflow:'hidden'}}>
+
+            {/* Row header */}
+            <div style={{padding:'12px 13px',display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:42,height:42,borderRadius:11,background:'rgba(125,249,170,.07)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{cat.emoji}</div>
+              <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>setExpandId(isExp?null:exp.id)}>
+                <div style={{fontWeight:700,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{exp.title}</div>
+                <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
+                  {cat.label} · {payer?.name||'?'} paid · {new Date(exp.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+                </div>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0,marginRight:6}}>
+                <div style={{fontFamily:'Orbitron,monospace',fontSize:15,fontWeight:700,color:'#7DF9AA'}}>{fmtAmt(exp.amount)}</div>
+                <div style={{fontSize:10,fontWeight:700,color:allPaid?'#6BCB77':'#FFD93D',marginTop:2}}>{allPaid?'✅ Settled':`${unpaid} pending`}</div>
+              </div>
+              {/* Action buttons */}
+              <div style={{display:'flex',gap:5,flexShrink:0}}>
+                <button onClick={()=>isEdit?setEditId(null):startEdit(exp)}
+                  style={{width:32,height:32,borderRadius:8,border:'1px solid rgba(77,150,255,.25)',background:'rgba(77,150,255,.08)',color:'#4D96FF',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  ✏️
+                </button>
+                <button onClick={()=>delExp(exp)}
+                  style={{width:32,height:32,borderRadius:8,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            {/* Edit form */}
+            {isEdit && (
+              <div style={{borderTop:'1px solid rgba(125,249,170,.08)',padding:'13px 13px',background:'rgba(77,150,255,.04)'}}>
+                <div style={{fontSize:10,fontWeight:700,color:'#4D96FF',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>✏️ Edit Expense</div>
+                <div style={{marginBottom:9}}>
+                  <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Title</label>
+                  <input value={editData.title||''} onChange={e=>setEditData(d=>({...d,title:e.target.value}))}
+                    style={{...inp,padding:'10px 12px',fontSize:'15px'}} placeholder="Title"/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:9}}>
+                  <div>
+                    <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Amount (₹)</label>
+                    <input type="number" value={editData.amount||''} onChange={e=>setEditData(d=>({...d,amount:e.target.value}))}
+                      style={{...inp,padding:'10px 12px',fontSize:'15px',fontFamily:'Orbitron,monospace',color:'#7DF9AA'}}/>
+                  </div>
+                  <div>
+                    <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Category</label>
+                    <select value={editData.category||'other'} onChange={e=>setEditData(d=>({...d,category:e.target.value}))}
+                      style={{...inp,padding:'10px 12px',fontSize:'15px'}}>
+                      {CATS.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{marginBottom:11}}>
+                  <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Note</label>
+                  <input value={editData.note||''} onChange={e=>setEditData(d=>({...d,note:e.target.value}))}
+                    style={{...inp,padding:'10px 12px',fontSize:'15px'}} placeholder="Optional note..."/>
+                </div>
+                <div style={{display:'flex',gap:9}}>
+                  <button onClick={()=>setEditId(null)}
+                    style={{flex:1,padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer',border:'1px solid rgba(125,249,170,.15)',background:'transparent',color:'#8890b0'}}>
+                    Cancel
+                  </button>
+                  <button onClick={()=>saveEdit(exp.id)} disabled={saving}
+                    style={{flex:2,padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:13,cursor:'pointer',border:'none',background:'linear-gradient(135deg,#7DF9AA,#00D4AA)',color:'#070810',opacity:saving?0.6:1}}>
+                    {saving?'Saving...':'💾 Save Changes'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Splits detail */}
+            {isExp && !isEdit && (
+              <div style={{borderTop:'1px solid rgba(125,249,170,.08)',padding:'12px 13px',background:'rgba(0,0,0,.15)'}}>
+                {exp.note && <div style={{fontSize:12,color:'#8890b0',marginBottom:9,fontStyle:'italic',padding:'7px 10px',background:'rgba(125,249,170,.04)',borderRadius:8}}>📝 {exp.note}</div>}
+                <div style={{fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Split details</div>
+                {splits.map(sp=>(
+                  <div key={sp.id} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 0',borderBottom:'1px solid rgba(125,249,170,.04)'}}>
+                    <Avatar emoji={sp.member?.avatar} color={sp.member?.color} size={26}/>
+                    <span style={{flex:1,fontWeight:600,fontSize:13}}>{sp.member?.name}</span>
+                    <span style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,color:sp.paid?'#6BCB77':'#FF6B6B'}}>{fmtAmt(sp.amount)}</span>
+                    {sp.paid ? (
+                      <button onClick={async()=>{await markSplitUnpaid(sp.id);toast('Marked unpaid','warn');loadExp()}}
+                        style={{fontSize:10,padding:'3px 9px',borderRadius:99,border:'1px solid rgba(107,203,119,.2)',background:'rgba(107,203,119,.08)',color:'#6BCB77',cursor:'pointer',fontFamily:'Rajdhani,sans-serif',whiteSpace:'nowrap'}}>
+                        ✅ Undo
+                      </button>
+                    ) : (
+                      <button onClick={async()=>{await markSplitPaid(sp.id);toast('Marked paid ✅');loadExp()}}
+                        style={{fontSize:10,padding:'3px 9px',borderRadius:99,border:'1px solid rgba(125,249,170,.2)',background:'rgba(125,249,170,.07)',color:'#7DF9AA',cursor:'pointer',fontFamily:'Rajdhani,sans-serif',whiteSpace:'nowrap'}}>
+                        Mark Paid
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
