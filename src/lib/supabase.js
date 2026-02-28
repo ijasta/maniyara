@@ -179,6 +179,28 @@ export async function forceRotate() {
   return newWeek
 }
 
+
+// Clear ALL assignments across all weeks
+export async function clearAllAssignments() {
+  const { error } = await supabase.from('assignments').delete().gt('week_number', 0)
+  if (error) throw error
+}
+
+// Clear only current week assignments
+export async function clearWeekAssignments(week) {
+  const { error } = await supabase.from('assignments').delete().eq('week_number', week)
+  if (error) throw error
+}
+
+// Reset done status only (keep assignments, just mark all as not done)
+export async function resetWeekDoneStatus(week) {
+  const { error } = await supabase
+    .from('assignments')
+    .update({ done: false, proof_url: null, proof_path: null, done_at: null, proof_expires_at: null })
+    .eq('week_number', week)
+  if (error) throw error
+}
+
 export async function swapTasks(memberId1, memberId2, week) {
   const { data: a1 } = await supabase.from('assignments').select('id,task_id').eq('member_id', memberId1).eq('week_number', week).single()
   const { data: a2 } = await supabase.from('assignments').select('id,task_id').eq('member_id', memberId2).eq('week_number', week).single()
@@ -212,4 +234,104 @@ export async function addLog(action, actor, details = '') {
 
 export function buildWALink(phone, message) {
   return `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
+}
+
+// ── EXPENSES ──────────────────────────────────────────────
+export async function getExpenses() {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select(`*, paid_by_member:members!paid_by(id,name,avatar,color), expense_splits(*, member:members(id,name,avatar,color))`)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function addExpense(title, amount, category, paidById, note, splitMemberIds) {
+  // Insert expense
+  const { data: exp, error } = await supabase
+    .from('expenses')
+    .insert({ title, amount, category, paid_by: paidById, note })
+    .select().single()
+  if (error) throw error
+
+  // Calculate each person's share
+  const share = Math.round((amount / splitMemberIds.length) * 100) / 100
+  const splits = splitMemberIds.map((mid, i) => ({
+    expense_id: exp.id,
+    member_id:  mid,
+    // Give any rounding remainder to the last person
+    amount: i === splitMemberIds.length - 1
+      ? Math.round((amount - share * (splitMemberIds.length - 1)) * 100) / 100
+      : share,
+    // Person who paid is already "paid" for their own share
+    paid: mid === paidById,
+    paid_at: mid === paidById ? new Date().toISOString() : null,
+  }))
+
+  const { error: se } = await supabase.from('expense_splits').insert(splits)
+  if (se) throw se
+  return exp
+}
+
+export async function markSplitPaid(splitId) {
+  const { error } = await supabase
+    .from('expense_splits')
+    .update({ paid: true, paid_at: new Date().toISOString() })
+    .eq('id', splitId)
+  if (error) throw error
+}
+
+export async function markSplitUnpaid(splitId) {
+  const { error } = await supabase
+    .from('expense_splits')
+    .update({ paid: false, paid_at: null })
+    .eq('id', splitId)
+  if (error) throw error
+}
+
+export async function deleteExpense(expenseId) {
+  const { error } = await supabase.from('expenses').delete().eq('id', expenseId)
+  if (error) throw error
+}
+
+// Calculate who owes whom (simplified debt algorithm)
+export function calcDebts(expenses) {
+  // net[memberId] = positive means they are owed money, negative means they owe
+  const net = {}
+
+  expenses.forEach(exp => {
+    exp.expense_splits?.forEach(split => {
+      const mid = split.member_id
+      if (!net[mid]) net[mid] = { id: mid, name: split.member?.name, avatar: split.member?.avatar, color: split.member?.color, balance: 0 }
+      if (!split.paid) net[mid].balance -= split.amount  // they owe this much
+    })
+    // The payer is owed the sum of all unpaid splits (excluding their own)
+    const unpaidByOthers = exp.expense_splits?.filter(s => !s.paid && s.member_id !== exp.paid_by).reduce((sum, s) => sum + Number(s.amount), 0) || 0
+    if (exp.paid_by) {
+      if (!net[exp.paid_by]) net[exp.paid_by] = { id: exp.paid_by, name: exp.paid_by_member?.name, avatar: exp.paid_by_member?.avatar, color: exp.paid_by_member?.color, balance: 0 }
+      net[exp.paid_by].balance += unpaidByOthers
+    }
+  })
+
+  // Simplify: generate minimum transactions
+  const creditors = Object.values(net).filter(m => m.balance > 0.01).sort((a,b) => b.balance - a.balance)
+  const debtors   = Object.values(net).filter(m => m.balance < -0.01).sort((a,b) => a.balance - b.balance)
+  const txns = []
+
+  let ci = 0, di = 0
+  const cr = creditors.map(c => ({...c}))
+  const dr = debtors.map(d => ({...d}))
+
+  while (ci < cr.length && di < dr.length) {
+    const amount = Math.min(cr[ci].balance, -dr[di].balance)
+    if (amount > 0.01) {
+      txns.push({ from: dr[di], to: cr[ci], amount: Math.round(amount * 100) / 100 })
+    }
+    cr[ci].balance -= amount
+    dr[di].balance += amount
+    if (cr[ci].balance < 0.01) ci++
+    if (dr[di].balance > -0.01) di++
+  }
+
+  return txns
 }
