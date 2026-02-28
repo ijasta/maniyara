@@ -26,19 +26,25 @@ function useCountdown() {
   return cd
 }
 
-export default function Layout() {
+export default function Layout({ siteSettings }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const cd = useCountdown()
 
   const doSignOut = async () => { await signOut(); navigate('/auth') }
 
+  const showDash     = siteSettings?.page_dashboard !== false
+  const showTask     = siteSettings?.page_mytask    !== false
+  const showMembers  = siteSettings?.page_members   !== false
+  const showExpenses = siteSettings?.page_expenses  !== false
+  const showFund     = siteSettings?.page_fund      !== false
+
   const links = [
-    { to:'/', icon:'⌂', label:'Home',   short:'Home',  end:true },
-    { to:'/mytask',      icon:'✦', label:'My Task', short:'Task' },
-    { to:'/members',     icon:'◈', label:'Members', short:'Crew' },
-    { to:'/expenses',    icon:'💸', label:'Expenses', short:'Money' },
-    { to:'/fund',        icon:'🏦', label:'Fund',     short:'Fund'  },
+    ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',     short:'Home',  end:true }] : []),
+    ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task',  short:'Task'  }] : []),
+    ...(showMembers  ? [{ to:'/members',  icon:'◈',  label:'Members',  short:'Crew'  }] : []),
+    ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses', short:'Money' }] : []),
+    ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',     short:'Fund'  }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
   ]
 
