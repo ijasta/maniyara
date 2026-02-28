@@ -409,3 +409,38 @@ export function calcDebts(expenses) {
 
   return txns
 }
+
+// ── COMMON FUND ───────────────────────────────────────────
+export async function getFundData() {
+  const [{ data: txns, error: te }, { data: settings, error: se }] = await Promise.all([
+    supabase.from('fund_transactions')
+      .select('*, added_by_member:members!added_by(id,name,avatar,color)')
+      .order('created_at', { ascending: false }),
+    supabase.from('fund_settings').select('*, treasurer:members!treasurer_id(id,name,avatar,color)').eq('id',1).single()
+  ])
+  if (te) throw te
+  if (se && se.code !== 'PGRST116') throw se
+  const balance = (txns||[]).reduce((sum, t) => t.type==='credit' ? sum+Number(t.amount) : sum-Number(t.amount), 0)
+  return { txns: txns||[], settings: settings||{ monthly_target:1000, low_balance_alert:200 }, balance }
+}
+
+export async function addFundTransaction(type, amount, reason) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase.from('fund_transactions').insert({ type, amount, reason, added_by: user.id })
+  if (error) throw error
+}
+
+export async function updateFundTransaction(id, updates) {
+  const { error } = await supabase.from('fund_transactions').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteFundTransaction(id) {
+  const { error } = await supabase.from('fund_transactions').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function updateFundSettings(updates) {
+  const { error } = await supabase.from('fund_settings').update(updates).eq('id', 1)
+  if (error) throw error
+}
