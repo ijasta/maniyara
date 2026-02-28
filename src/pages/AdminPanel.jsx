@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react'
 import {
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
   getTasks, addTask, updateTask, deleteTask,
-  getCurrentAssignments, forceRotate, swapTasks,
+  getCurrentAssignments, forceRotate, swapTasks, getMembersOrdered, updateMemberOrder, adminAssignTasks,
   getSettings, updateSettings, getLogs, buildWALink, clearAllAssignments, clearWeekAssignments, resetWeekDoneStatus,
   COLORS, AVATARS
 } from '../lib/supabase'
@@ -262,70 +261,11 @@ function AdminContent() {
 
       {/* ── ROTATION ── */}
       {tab==='rotation' && (
-        <div>
-          <SecHead title={`Week ${week} Assignments`}/>
-          <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-            {assigns.length===0 ? (
-              <div style={{textAlign:'center',padding:24,color:'#4a5070'}}>No assignments yet. Force rotate to create.</div>
-            ) : assigns.map(a=>{
-              const m=a.members||members.find(x=>x.id===a.member_id)
-              const t=a.tasks||tasks.find(x=>x.id===a.task_id)
-              if(!m||!t) return null
-              return (
-                <div key={a.id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 0',borderBottom:'1px solid rgba(125,249,170,.06)'}}>
-                  <Avatar emoji={m.avatar} color={m.color} size={28}/>
-                  <span style={{fontWeight:700,fontSize:13,flex:1}}>{m.name}</span>
-                  <span style={{fontSize:12,color:'#8890b0'}}>{t.emoji} {t.name}</span>
-                  <span style={{fontSize:15}}>{a.done?'✅':'⏳'}</span>
-                </div>
-              )
-            })}
-          </div>
-
-          <Btn full loading={rotating} variant="danger" style={{marginBottom:18,padding:14}} onClick={async()=>{
-            if(!confirm('Force rotate ALL tasks to next week? This cannot be undone.')) return
-            setRotating(true)
-            try{const w=await forceRotate();toast(`Rotated! Week ${w} started 🔄`);load()}
-            catch(e){toast('Rotate failed: '+e.message,'error')}
-            finally{setRotating(false)}
-          }}>⚡ FORCE ROTATE NOW → Week {week+1}</Btn>
-
-          {/* Swap */}
-          <SecHead title="Swap Tasks"/>
-          <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14}}>
-            <SwapPanel members={members} assigns={assigns} week={week} toast={toast} onDone={load}/>
-          </div>
-
-          {/* Clear Assignments */}
-          <SecHead title="Clear Assignments"/>
-          <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14,display:'flex',flexDirection:'column',gap:10}}>
-            <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:4}}>
-              ⚠️ Use these to reset task progress for the week without rotating to a new week.
-            </div>
-
-            {/* Reset done status only */}
-            <Btn variant="warn" full onClick={async()=>{
-              if(!confirm(`Reset all DONE status for Week ${week}? Tasks stay assigned but marked as not done again.`)) return
-              try { await resetWeekDoneStatus(week); toast(`Week ${week} done-status reset ✅`); load() }
-              catch(e) { toast('Failed: '+e.message,'error') }
-            }}>🔄 Reset Done Status — Week {week}</Btn>
-
-            {/* Clear current week only */}
-            <Btn variant="danger" full onClick={async()=>{
-              if(!confirm(`Delete ALL assignments for Week ${week}? Members will have no tasks until you rotate again.`)) return
-              try { await clearWeekAssignments(week); toast(`Week ${week} assignments cleared 🗑️`,'warn'); load() }
-              catch(e) { toast('Failed: '+e.message,'error') }
-            }}>🗑️ Clear Week {week} Assignments</Btn>
-
-            {/* Nuclear — clear all weeks */}
-            <Btn variant="danger" full onClick={async()=>{
-              if(!confirm('⚠️ DELETE ALL assignments across ALL weeks? This cannot be undone!')) return
-              if(!confirm('Are you absolutely sure? All task history will be gone.')) return
-              try { await clearAllAssignments(); toast('All assignments deleted 🗑️','warn'); load() }
-              catch(e) { toast('Failed: '+e.message,'error') }
-            }}>☢️ Clear ALL Assignments (All Weeks)</Btn>
-          </div>
-        </div>
+        <RotationTab
+          members={members} tasks={tasks} assigns={assigns}
+          week={week} rotating={rotating} setRotating={setRotating}
+          toast={toast} onDone={load}
+        />
       )}
 
       {/* ── WHATSAPP ── */}
@@ -509,6 +449,202 @@ function SwapPanel({ members, assigns, week, toast, onDone }) {
         catch(e){toast('Swap failed: '+e.message,'error')}
         finally{setL(false)}
       }}>⇄ SWAP TASKS</Btn>
+    </div>
+  )
+}
+
+
+function RotationTab({ members, tasks, assigns, week, rotating, setRotating, toast, onDone }) {
+  const [orderedMembers, setOrdered] = useState([...members].sort((a,b)=>(a.sort_order||99)-(b.sort_order||99)||(new Date(a.created_at)-new Date(b.created_at))))
+  const [manualMap, setManualMap]   = useState({}) // memberId → taskId for week-1 assign
+  const [assigning, setAssigning]   = useState(false)
+  const [dragging,  setDragging]    = useState(null)
+
+  // Preview what next week looks like
+  const taskMap = {}
+  assigns.forEach(a => { taskMap[a.member_id || a.members?.id] = a.tasks || tasks.find(t=>t.id===a.task_id) })
+
+  const nextPreview = orderedMembers.map((m,i) => {
+    const nextM = orderedMembers[(i+1) % orderedMembers.length]
+    return { member: m, task: taskMap[nextM.id] }
+  })
+
+  const hasAssignments = assigns.length > 0
+
+  // Drag to reorder
+  const onDragStart = (i) => setDragging(i)
+  const onDragOver  = (e, i) => {
+    e.preventDefault()
+    if (dragging === null || dragging === i) return
+    const arr = [...orderedMembers]
+    const [moved] = arr.splice(dragging, 1)
+    arr.splice(i, 0, moved)
+    setOrdered(arr)
+    setDragging(i)
+  }
+  const onDragEnd = async () => {
+    setDragging(null)
+    // Save new order to DB
+    await Promise.all(orderedMembers.map((m,i) => updateMemberOrder(m.id, i+1)))
+    toast('Rotation order saved ✅')
+    onDone()
+  }
+
+  return (
+    <div>
+      {/* ── AUTO ROTATION INFO ── */}
+      <div style={{background:'rgba(125,249,170,.07)',border:'1px solid rgba(125,249,170,.22)',borderRadius:13,padding:14,marginBottom:16}}>
+        <div style={{fontFamily:'Orbitron,monospace',fontSize:11,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:8}}>🤖 AUTO ROTATION ACTIVE</div>
+        <div style={{fontSize:13,color:'#8890b0',lineHeight:1.7}}>
+          Every <strong style={{color:'#E8F0FF'}}>Friday at midnight</strong> tasks automatically rotate UP.<br/>
+          Bottom member's task → Top member. Everyone shifts down one.<br/>
+          Currently on <strong style={{color:'#7DF9AA'}}>Week {week}</strong>.
+        </div>
+      </div>
+
+      {/* ── ROTATION ORDER ── */}
+      <SecHead title="Rotation Order" badge="drag to reorder"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:16}}>
+        <div style={{fontSize:12,color:'#8890b0',marginBottom:12,lineHeight:1.6}}>
+          Drag members to set the rotation order. Tasks shift UP this list every Friday.
+        </div>
+        {orderedMembers.map((m, i) => {
+          const curTask = taskMap[m.id]
+          const nextTask = taskMap[orderedMembers[(i+1) % orderedMembers.length]?.id]
+          return (
+            <div key={m.id} draggable
+              onDragStart={()=>onDragStart(i)}
+              onDragOver={e=>onDragOver(e,i)}
+              onDragEnd={onDragEnd}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 11px',borderRadius:9,marginBottom:7,
+                background:dragging===i?'rgba(125,249,170,.1)':'#131525',
+                border:`1px solid ${dragging===i?'rgba(125,249,170,.3)':'rgba(125,249,170,.07)'}`,
+                cursor:'grab',transition:'background .1s',userSelect:'none'}}>
+              <span style={{fontSize:18,color:'#4a5070',flexShrink:0}}>⠿</span>
+              <span style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:700,color:'#7DF9AA',width:22,flexShrink:0}}>{i+1}</span>
+              <Avatar emoji={m.avatar} color={m.color} size={30}/>
+              <span style={{fontWeight:700,fontSize:13,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.name}</span>
+              {curTask && <span style={{fontSize:11,color:'#8890b0',flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:100}}>{curTask.emoji} {curTask.name}</span>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── CURRENT WEEK VIEW ── */}
+      <SecHead title={`Week ${week} — Current`}/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:16}}>
+        {assigns.length===0 ? (
+          <div style={{textAlign:'center',padding:24,color:'#4a5070'}}>
+            <div style={{fontSize:32,marginBottom:8}}>📋</div>
+            <div style={{fontWeight:700,marginBottom:4}}>No assignments yet for Week {week}</div>
+            <div style={{fontSize:12}}>Use the Week 1 Setup below to assign tasks manually.</div>
+          </div>
+        ) : assigns.map(a=>{
+          const m=a.members||members.find(x=>x.id===a.member_id)
+          const t=a.tasks||tasks.find(x=>x.id===a.task_id)
+          if(!m||!t) return null
+          return (
+            <div key={a.id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 0',borderBottom:'1px solid rgba(125,249,170,.06)'}}>
+              <Avatar emoji={m.avatar} color={m.color} size={28}/>
+              <span style={{fontWeight:700,fontSize:13,flex:1}}>{m.name}</span>
+              <span style={{fontSize:12,color:'#8890b0'}}>{t.emoji} {t.name}</span>
+              <span style={{fontSize:15,flexShrink:0}}>{a.done?'✅':'⏳'}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── NEXT WEEK PREVIEW ── */}
+      {hasAssignments && (
+        <>
+          <SecHead title={`Week ${week+1} — Preview (after Friday rotation)`}/>
+          <div style={{background:'rgba(77,150,255,.05)',border:'1px solid rgba(77,150,255,.18)',borderRadius:13,padding:14,marginBottom:16}}>
+            <div style={{fontSize:12,color:'#4D96FF',marginBottom:10,fontWeight:600}}>This is what tasks will look like after auto-rotation this Friday ↓</div>
+            {nextPreview.map(({member:m, task:t}, i)=>(
+              <div key={m.id} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 0',borderBottom:'1px solid rgba(77,150,255,.07)'}}>
+                <Avatar emoji={m.avatar} color={m.color} size={26}/>
+                <span style={{fontWeight:700,fontSize:13,flex:1}}>{m.name}</span>
+                <span style={{fontSize:20,flexShrink:0}}>←</span>
+                <span style={{fontSize:12,color:'#8890b0',flexShrink:0}}>{t ? `${t.emoji} ${t.name}` : '—'}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── WEEK 1 MANUAL ASSIGN ── */}
+      {!hasAssignments && (
+        <>
+          <SecHead title="Week 1 Setup — Assign Tasks Manually"/>
+          <div style={{background:'#0d0e1a',border:'1px solid rgba(255,217,61,.2)',borderRadius:13,padding:14,marginBottom:16}}>
+            <div style={{fontSize:12,color:'#FFD93D',marginBottom:14,lineHeight:1.6,fontWeight:600}}>
+              ⚠️ This is the first week. Assign a task to each member manually. From next Friday, rotation happens automatically.
+            </div>
+            {orderedMembers.map(m => (
+              <div key={m.id} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <Avatar emoji={m.avatar} color={m.color} size={32}/>
+                <span style={{fontWeight:700,fontSize:13,width:100,flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.name}</span>
+                <select value={manualMap[m.id]||''} onChange={e=>setManualMap(prev=>({...prev,[m.id]:e.target.value}))}
+                  style={{flex:1,background:'#131525',border:`1px solid ${manualMap[m.id]?'rgba(125,249,170,.3)':'rgba(125,249,170,.15)'}`,borderRadius:8,padding:'9px 11px',color:'#E8F0FF',fontSize:'15px',fontFamily:'Rajdhani,sans-serif',outline:'none'}}>
+                  <option value="">— Pick a task —</option>
+                  {tasks.filter(t=>t.active).map(t=>(
+                    <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            <Btn full loading={assigning} style={{marginTop:6,padding:13}} onClick={async()=>{
+              const unassigned = orderedMembers.filter(m=>!manualMap[m.id])
+              if(unassigned.length>0){toast(`Assign tasks to: ${unassigned.map(m=>m.name).join(', ')}`, 'warn');return}
+              setAssigning(true)
+              try {
+                const rows = orderedMembers.map(m=>({member_id:m.id, task_id:manualMap[m.id]}))
+                await adminAssignTasks(rows)
+                toast('Week 1 tasks assigned! ✅ Auto-rotation starts this Friday.')
+                onDone()
+              } catch(e){toast('Failed: '+e.message,'error')}
+              finally{setAssigning(false)}
+            }}>✅ Assign Tasks for Week 1</Btn>
+          </div>
+        </>
+      )}
+
+      {/* ── FORCE ROTATE ── */}
+      <SecHead title="Manual Controls"/>
+      <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+        <Btn full loading={rotating} variant="warn" style={{padding:13}} onClick={async()=>{
+          if(!confirm(`Force rotate NOW to Week ${week+1}? Same as what happens automatically on Friday.`)) return
+          setRotating(true)
+          try{const w=await forceRotate();toast(`Rotated to Week ${w} ✅`);onDone()}
+          catch(e){toast('Rotate failed: '+e.message,'error')}
+          finally{setRotating(false)}
+        }}>⚡ Force Rotate Now → Week {week+1}</Btn>
+
+        <Btn variant="ghost" full onClick={async()=>{
+          if(!confirm(`Reset all DONE status for Week ${week}? Tasks stay, just unmarked.`)) return
+          try{await resetWeekDoneStatus(week);toast('Done status reset ✅');onDone()}
+          catch(e){toast('Failed: '+e.message,'error')}
+        }}>🔄 Reset Done Status — Week {week}</Btn>
+
+        <Btn variant="danger" full onClick={async()=>{
+          if(!confirm(`Delete ALL assignments for Week ${week}?`)) return
+          try{await clearWeekAssignments(week);toast('Week cleared 🗑️','warn');onDone()}
+          catch(e){toast('Failed: '+e.message,'error')}
+        }}>🗑️ Clear Week {week} Assignments</Btn>
+
+        <Btn variant="danger" full onClick={async()=>{
+          if(!confirm('DELETE ALL assignments across ALL weeks?')) return
+          if(!confirm('Final confirmation — cannot be undone!')) return
+          try{await clearAllAssignments();toast('All cleared 🗑️','warn');onDone()}
+          catch(e){toast('Failed: '+e.message,'error')}
+        }}>☢️ Clear ALL Assignments Ever</Btn>
+      </div>
+
+      {/* ── SWAP ── */}
+      <SecHead title="Swap Two Members' Tasks"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14}}>
+        <SwapPanel members={members} assigns={assigns} week={week} toast={toast} onDone={onDone}/>
+      </div>
     </div>
   )
 }
