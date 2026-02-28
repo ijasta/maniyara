@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from './lib/AuthContext'
+import { getSettings } from './lib/supabase'
 import Layout from './components/Layout'
 import AuthPage from './pages/AuthPage'
 import PendingPage from './pages/PendingPage'
@@ -9,6 +11,7 @@ import Members from './pages/Members'
 import Expenses from './pages/Expenses'
 import CommonFund from './pages/CommonFund'
 import AdminPanel from './pages/AdminPanel'
+import MaintenancePage from './pages/MaintenancePage'
 import LoadingScreen from './components/LoadingScreen'
 
 function Guard({ children, adminOnly }) {
@@ -21,21 +24,59 @@ function Guard({ children, adminOnly }) {
   return children
 }
 
+// Wrapper that redirects to home if page is disabled
+function PageGuard({ enabled, children }) {
+  if (enabled === false) return <Navigate to="/" replace />
+  return children
+}
+
 export default function App() {
   const { user, profile, loading } = useAuth()
-  if (loading) return <LoadingScreen />
+  const [siteSettings, setSiteSettings] = useState(null)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [adminOverride, setAdminOverride] = useState(false)
+
+  useEffect(() => {
+    getSettings()
+      .then(s => setSiteSettings(s))
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true))
+  }, [])
+
+  if (loading || !settingsLoaded) return <LoadingScreen />
+
+  // Maintenance mode — show to all non-admins (admins see override button)
+  const inMaintenance = siteSettings?.maintenance_mode && !adminOverride
+  if (inMaintenance && user) {
+    return (
+      <MaintenancePage
+        message={siteSettings?.maintenance_message}
+        isAdmin={profile?.is_admin}
+        onExit={() => setAdminOverride(true)}
+      />
+    )
+  }
+
+  // Page visibility flags (default true if not set)
+  const pages = {
+    dashboard: siteSettings?.page_dashboard !== false,
+    mytask:    siteSettings?.page_mytask    !== false,
+    members:   siteSettings?.page_members   !== false,
+    expenses:  siteSettings?.page_expenses  !== false,
+    fund:      siteSettings?.page_fund      !== false,
+  }
 
   return (
     <Routes>
       <Route path="/auth" element={user && profile?.status === 'approved' ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/pending" element={<PendingPage />} />
-      <Route path="/" element={<Guard><Layout /></Guard>}>
-        <Route index           element={<Dashboard />} />
-        <Route path="mytask"   element={<MyTask />} />
-        <Route path="members"  element={<Members />} />
-        <Route path="expenses" element={<Expenses />} />
-        <Route path="fund"     element={<CommonFund />} />
-        <Route path="admin"    element={<Guard adminOnly><AdminPanel /></Guard>} />
+      <Route path="/" element={<Guard><Layout siteSettings={siteSettings}/></Guard>}>
+        <Route index         element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
+        <Route path="mytask"  element={<PageGuard enabled={pages.mytask}><MyTask /></PageGuard>} />
+        <Route path="members" element={<PageGuard enabled={pages.members}><Members /></PageGuard>} />
+        <Route path="expenses"element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
+        <Route path="fund"    element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
+        <Route path="admin"   element={<Guard adminOnly><AdminPanel onSettingsChange={()=>getSettings().then(setSiteSettings)}/></Guard>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
