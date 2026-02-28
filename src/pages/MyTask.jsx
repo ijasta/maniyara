@@ -23,7 +23,7 @@ function MyTaskContent() {
 
   const handleFile = e => {
     const f = e.target.files[0]; if (!f) return
-    if (f.size > 5*1024*1024) { toast('Max 5MB','warn'); return }
+    if (f.size > 60*1024*1024) { toast('Max 60MB','warn'); return }
     setProof({ file:f, url:URL.createObjectURL(f) })
   }
 
@@ -107,7 +107,7 @@ function MyTaskContent() {
                   <div style={{fontWeight:700,fontSize:14,marginBottom:3}}>Tap to take / upload photo</div>
                   <div style={{fontSize:12,color:'#4a5070'}}>JPG · PNG · Max 5MB</div>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleFile}/>
+                <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
 
                 {proof && (
                   <div style={{marginBottom:12}}>
