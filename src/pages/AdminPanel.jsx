@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import {
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
@@ -400,7 +401,7 @@ function AdminContent() {
           <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
             <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#FF6B6B',textTransform:'uppercase',marginBottom:13}}>🛠️ Danger Zone</div>
             <div style={{display:'flex',flexDirection:'column',gap:9}}>
-              <Btn variant="danger" full onClick={()=>{if(confirm('Reset ALL member scores to 0?')) {members.forEach(m=>updateMember(m.id,{score:0,streak:0}));toast('All scores reset','warn');load()}}}>🔄 Reset All Scores</Btn>
+
               <Btn variant="danger" full onClick={async()=>{
                 if(!confirm(`Clear all assignments for current Week ${week}?`)) return
                 try{await clearWeekAssignments(week);toast('Week assignments cleared 🗑️','warn');load()}
