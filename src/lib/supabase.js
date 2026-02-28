@@ -158,35 +158,18 @@ export async function markTaskDone(assignmentId, memberId, proofFile) {
   await supabase.from('members').update({ score: (m?.score||0)+10, streak: (m?.streak||0)+1 }).eq('id', memberId)
 }
 
-// ── ROTATION ──────────────────────────────────────────────
+// ── ASSIGN & ROTATE ───────────────────────────────────────
 
-// Get members in rotation order (sort_order then created_at)
-export async function getMembersOrdered() {
-  const { data, error } = await supabase
-    .from('members')
-    .select('*')
-    .eq('status', 'approved')
-    .order('sort_order', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  return data || []
-}
-
-// Update member sort order
-export async function updateMemberOrder(memberId, sortOrder) {
-  const { error } = await supabase
-    .from('members')
-    .update({ sort_order: sortOrder })
-    .eq('id', memberId)
-  if (error) throw error
-}
-
-// Manual admin assign for week 1 (or any week)
-export async function adminAssignTasks(assignments) {
-  // assignments = [{ member_id, task_id }]
+// Admin assigns tasks to members for current week
+// assigns = [{ member_id, task_id }]
+export async function adminAssignTasks(assigns) {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
   const week = s?.current_week || 1
-  const rows = assignments.map(a => ({
+
+  // Delete existing assignments for this week first (re-assign)
+  await supabase.from('assignments').delete().eq('week_number', week)
+
+  const rows = assigns.map(a => ({
     member_id:   a.member_id,
     task_id:     a.task_id,
     week_number: week,
@@ -194,32 +177,39 @@ export async function adminAssignTasks(assignments) {
   }))
   const { error } = await supabase.from('assignments').insert(rows)
   if (error) throw error
+
+  await supabase.from('logs').insert({
+    action: `Tasks assigned for Week ${week}`,
+    actor: 'Admin',
+    details: `${rows.length} members assigned`
+  })
   return week
 }
 
-// Force rotate NOW (same logic as edge function — rotate UP)
-export async function forceRotate() {
+// Admin clicks Rotate — shifts tasks UP the list, new week
+export async function rotateToNextWeek() {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
-  const currentWeek = s?.current_week || 0
+  const currentWeek = s?.current_week || 1
   const newWeek = currentWeek + 1
 
-  // Get members in sort order
-  const members = await getMembersOrdered()
-  if (!members?.length) throw new Error('No approved members')
-
-  if (currentWeek === 0) {
-    // First time — just bump week, admin assigns manually
-    await supabase.from('settings').update({ current_week: newWeek }).eq('id', 1)
-    return newWeek
-  }
-
   // Get current week assignments
-  const { data: currentAssigns } = await supabase
+  const { data: currentAssigns, error: ae } = await supabase
     .from('assignments')
     .select('member_id, task_id')
     .eq('week_number', currentWeek)
 
-  if (!currentAssigns?.length) throw new Error('No assignments for current week to rotate from')
+  if (ae) throw new Error('Failed to load assignments: ' + ae.message)
+  if (!currentAssigns?.length) throw new Error('No assignments found for current week. Assign tasks first.')
+
+  // Get members ordered by created_at (consistent order)
+  const { data: members, error: me } = await supabase
+    .from('members')
+    .select('id, name')
+    .eq('status', 'approved')
+    .order('created_at', { ascending: true })
+
+  if (me) throw new Error('Failed to load members')
+  if (!members?.length) throw new Error('No approved members')
 
   // Build task map: memberId → taskId
   const taskMap = {}
@@ -227,30 +217,40 @@ export async function forceRotate() {
 
   const memberIds = members.map(m => m.id)
 
-  // Rotate UP: member[i] gets task of member[i+1], last gets task of first
+  // Rotate UP: member[i] gets task of member[i+1]
+  // Last member gets task of first member
   const rows = memberIds.map((memberId, i) => {
-    const nextMemberId = memberIds[(i + 1) % memberIds.length]
+    const fromMemberId = memberIds[(i + 1) % memberIds.length]
     return {
       member_id:   memberId,
-      task_id:     taskMap[nextMemberId],
+      task_id:     taskMap[fromMemberId],
       week_number: newWeek,
       done:        false,
     }
   }).filter(r => r.task_id)
 
-  if (!rows.length) throw new Error('Could not build rotation — no task data found')
+  if (!rows.length) throw new Error('Could not build rotation')
 
+  // Bump week number
   await supabase.from('settings').update({ current_week: newWeek }).eq('id', 1)
+
+  // Insert new week assignments
   const { error } = await supabase.from('assignments').insert(rows)
   if (error) throw error
 
   await supabase.from('logs').insert({
-    action: `Manual rotation to Week ${newWeek}`,
+    action: `Rotated to Week ${newWeek}`,
     actor: 'Admin',
     details: `${rows.length} tasks rotated UP`
   })
 
   return newWeek
+}
+
+// Delete a single assignment
+export async function deleteAssignment(assignmentId) {
+  const { error } = await supabase.from('assignments').delete().eq('id', assignmentId)
+  if (error) throw error
 }
 
 
