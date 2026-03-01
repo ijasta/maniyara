@@ -295,6 +295,20 @@ export async function updateSettings(updates) {
   if (error) throw error
 }
 
+// Check if current user is task assigner or admin
+export async function getMyRole(userId) {
+  const { data, error } = await supabase
+    .from('settings')
+    .select('task_assigner_id, task_assigner:members!task_assigner_id(id,name,avatar,color)')
+    .eq('id', 1).single()
+  if (error) return { isAssigner: false, assigner: null }
+  return {
+    isAssigner: data?.task_assigner_id === userId,
+    assigner:   data?.task_assigner || null,
+    assignerId: data?.task_assigner_id
+  }
+}
+
 // ── LOGS ──────────────────────────────────────────────────
 export async function getLogs(limit = 60) {
   const { data, error } = await supabase.from('logs').select('*').order('created_at', { ascending: false }).limit(limit)
