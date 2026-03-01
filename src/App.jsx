@@ -11,6 +11,7 @@ import Members from './pages/Members'
 import Expenses from './pages/Expenses'
 import CommonFund from './pages/CommonFund'
 import AdminPanel from './pages/AdminPanel'
+import TaskAssigner from './pages/TaskAssigner'
 import MaintenancePage from './pages/MaintenancePage'
 import LoadingScreen from './components/LoadingScreen'
 
@@ -24,7 +25,6 @@ function Guard({ children, adminOnly }) {
   return children
 }
 
-// Wrapper that redirects to home if page is disabled
 function PageGuard({ enabled, children }) {
   if (enabled === false) return <Navigate to="/" replace />
   return children
@@ -45,7 +45,6 @@ export default function App() {
 
   if (loading || !settingsLoaded) return <LoadingScreen />
 
-  // Maintenance mode — show to all non-admins (admins see override button)
   const inMaintenance = siteSettings?.maintenance_mode && !adminOverride
   if (inMaintenance && user) {
     return (
@@ -57,7 +56,6 @@ export default function App() {
     )
   }
 
-  // Page visibility flags (default true if not set)
   const pages = {
     dashboard: siteSettings?.page_dashboard !== false,
     mytask:    siteSettings?.page_mytask    !== false,
@@ -66,16 +64,20 @@ export default function App() {
     fund:      siteSettings?.page_fund      !== false,
   }
 
+  // Task assigner: is current user the assigned task assigner?
+  const isTaskAssigner = user && siteSettings?.task_assigner_id === user.id
+
   return (
     <Routes>
       <Route path="/auth" element={user && profile?.status === 'approved' ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/pending" element={<PendingPage />} />
-      <Route path="/" element={<Guard><Layout siteSettings={siteSettings}/></Guard>}>
-        <Route index         element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
+      <Route path="/" element={<Guard><Layout siteSettings={siteSettings} isTaskAssigner={isTaskAssigner}/></Guard>}>
+        <Route index          element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
         <Route path="mytask"  element={<PageGuard enabled={pages.mytask}><MyTask /></PageGuard>} />
         <Route path="members" element={<PageGuard enabled={pages.members}><Members /></PageGuard>} />
         <Route path="expenses"element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
         <Route path="fund"    element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
+        <Route path="assign"  element={<Guard><TaskAssigner /></Guard>} />
         <Route path="admin"   element={<Guard adminOnly><AdminPanel onSettingsChange={()=>getSettings().then(setSiteSettings)}/></Guard>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
