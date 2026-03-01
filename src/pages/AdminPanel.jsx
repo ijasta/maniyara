@@ -919,12 +919,7 @@ function ExpensesAdminTab({ toast, members }) {
 // SETTINGS TAB
 // ══════════════════════════════════════════════════════════
 function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks }) {
-  const [maint,    setMaint]    = useState(settings?.maintenance_mode || false)
-  const [maintMsg, setMaintMsg] = useState(settings?.maintenance_msg  || 'We are performing scheduled maintenance. Back soon! 🔧')
-  const [maintEta, setMaintEta] = useState(settings?.maintenance_eta  || '')
-  const [showExp,  setShowExp]  = useState(settings?.show_expenses !== false)
-  const [showFund, setShowFund] = useState(settings?.show_fund     !== false)
-  const [saving,   setSaving]   = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const save = async (updates) => {
     setSaving(true)
@@ -935,98 +930,6 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
 
   return (
     <div>
-      {/* ── SITE VISIBILITY ── */}
-      <SecHead title="Page Visibility"/>
-      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        <div style={{fontSize:11,color:'#8890b0',marginBottom:14,lineHeight:1.6}}>
-          Toggle which pages are visible to members. Hidden pages disappear from the nav bar instantly.
-        </div>
-
-        {/* Expenses toggle */}
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'13px 0',borderBottom:'1px solid rgba(125,249,170,.06)'}}>
-          <div style={{fontSize:28}}>💸</div>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:14}}>Expenses Page</div>
-            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>Show/hide the shared expenses tracker</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:11,fontWeight:700,color:showExp?'#7DF9AA':'#FF6B6B'}}>{showExp?'VISIBLE':'HIDDEN'}</span>
-            <Toggle value={showExp} onChange={async v=>{ setShowExp(v); await save({ show_expenses: v }) }}/>
-          </div>
-        </div>
-
-        {/* Fund toggle */}
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'13px 0'}}>
-          <div style={{fontSize:28}}>🏦</div>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:14}}>Common Fund Page</div>
-            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>Show/hide the common fund tracker</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:11,fontWeight:700,color:showFund?'#7DF9AA':'#FF6B6B'}}>{showFund?'VISIBLE':'HIDDEN'}</span>
-            <Toggle value={showFund} onChange={async v=>{ setShowFund(v); await save({ show_fund: v }) }}/>
-          </div>
-        </div>
-      </div>
-
-      {/* ── MAINTENANCE MODE ── */}
-      <SecHead title="Maintenance Mode"/>
-      <div style={{background:maint?'rgba(255,154,60,.07)':'#0d0e1a',border:`1px solid ${maint?'rgba(255,154,60,.3)':'rgba(255,154,60,.12)'}`,borderRadius:13,padding:14,marginBottom:14,transition:'all .2s'}}>
-
-        {/* Big toggle */}
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: maint ? 16 : 0}}>
-          <div style={{fontSize:32}}>🔧</div>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:15}}>Maintenance Mode</div>
-            <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
-              {maint ? '⚠️ Site is OFFLINE for members right now' : 'Members can access the site normally'}
-            </div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:11,fontWeight:700,color:maint?'#FF9A3C':'#7DF9AA'}}>{maint?'ON':'OFF'}</span>
-            <Toggle value={maint} onChange={async v=>{
-              if (v && !confirm('Enable maintenance mode? Members will see a maintenance page immediately!')) return
-              setMaint(v)
-              await save({ maintenance_mode: v })
-              toast(v ? '🔧 Maintenance mode ON — members see offline page' : '✅ Site is back online for members')
-            }}/>
-          </div>
-        </div>
-
-        {/* Maintenance settings — show when on */}
-        {maint && (
-          <div style={{borderTop:'1px solid rgba(255,154,60,.15)',paddingTop:14}}>
-            <div style={{marginBottom:11}}>
-              <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Message shown to members</label>
-              <textarea
-                value={maintMsg} onChange={e=>setMaintMsg(e.target.value)}
-                rows={3} style={{...inp, width:'100%', resize:'vertical'}}
-                placeholder="We are performing maintenance. Back soon!"/>
-            </div>
-            <div style={{marginBottom:12}}>
-              <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Estimated time (optional)</label>
-              <input value={maintEta} onChange={e=>setMaintEta(e.target.value)}
-                style={{...inp}} placeholder="e.g. Back in 30 minutes, Tonight by 10 PM..."/>
-            </div>
-            <Btn full loading={saving} onClick={()=>save({ maintenance_msg: maintMsg, maintenance_eta: maintEta })}
-              style={{background:'linear-gradient(135deg,#FF9A3C,#FFD93D)',color:'#070810'}}>
-              💾 Save Maintenance Message
-            </Btn>
-          </div>
-        )}
-      </div>
-
-      {/* Preview of maintenance page */}
-      {maint && (
-        <div style={{background:'rgba(255,154,60,.05)',border:'1px solid rgba(255,154,60,.15)',borderRadius:13,padding:'12px 14px',marginBottom:14}}>
-          <div style={{fontSize:10,fontWeight:700,color:'#FF9A3C',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>👁️ Member Preview</div>
-          <div style={{fontSize:13,color:'#8890b0',lineHeight:1.7}}>
-            Members will see: <span style={{color:'#FFD93D',fontWeight:700}}>"{maintMsg}"</span>
-            {maintEta && <span> with ETA: <span style={{color:'#FFD93D',fontWeight:700}}>"{maintEta}"</span></span>}
-          </div>
-        </div>
-      )}
-
       {/* ── HOUSE INFO ── */}
       <SecHead title="House Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
