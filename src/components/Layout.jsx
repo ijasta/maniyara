@@ -26,7 +26,7 @@ function useCountdown() {
   return cd
 }
 
-export default function Layout({ siteSettings }) {
+export default function Layout({ siteSettings, isTaskAssigner }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const cd = useCountdown()
@@ -45,6 +45,7 @@ export default function Layout({ siteSettings }) {
     ...(showMembers  ? [{ to:'/members',  icon:'◈',  label:'Members',  short:'Crew'  }] : []),
     ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses', short:'Money' }] : []),
     ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',     short:'Fund'  }] : []),
+    ...(isTaskAssigner && !profile?.is_admin ? [{ to:'/assign', icon:'📋', label:'Assign', short:'Assign' }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
   ]
 
