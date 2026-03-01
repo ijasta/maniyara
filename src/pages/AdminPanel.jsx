@@ -1039,6 +1039,38 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
         ))}
       </div>
 
+      {/* ── TASK ASSIGNER ROLE ── */}
+      <SecHead title="🎖️ Task Assigner Role"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        <div style={{fontSize:12,color:'#8890b0',lineHeight:1.7,marginBottom:12}}>
+          Assign a member who can manage weekly task assignments and rotate tasks. They get a dedicated <strong style={{color:'#E8F0FF'}}>📋 Assign</strong> tab in their nav bar.
+        </div>
+        <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Select Task Assigner</label>
+        <select
+          key={settings?.task_assigner_id}
+          defaultValue={settings?.task_assigner_id||''}
+          onChange={async e=>{
+            await updateSettings({task_assigner_id: e.target.value||null})
+            toast(e.target.value?'Task Assigner assigned ✅':'Task Assigner removed','warn')
+            onDone()
+          }}
+          style={{...inp,padding:'10px 13px',width:'100%',marginBottom:10}}>
+          <option value="">— None (admin only) —</option>
+          {members.filter(m=>m.status==='approved'&&!m.is_admin).map(m=>(
+            <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
+          ))}
+        </select>
+        {settings?.task_assigner_id ? (
+          <div style={{fontSize:12,color:'#7DF9AA',padding:'8px 12px',background:'rgba(125,249,170,.07)',borderRadius:8,border:'1px solid rgba(125,249,170,.15)'}}>
+            ✅ Assigned member sees a <strong>📋 Assign</strong> tab in their nav and can assign + rotate tasks
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:'#4a5070',padding:'8px 12px',background:'rgba(255,255,255,.03)',borderRadius:8,border:'1px solid rgba(255,255,255,.06)'}}>
+            No task assigner set — only admin can manage tasks
+          </div>
+        )}
+      </div>
+
       {/* ── DANGER ZONE ── */}
       <SecHead title="Danger Zone"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
