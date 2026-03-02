@@ -278,23 +278,9 @@ function AdminContent() {
 // ══════════════════════════════════════════════════════════
 function MemberCard({ m, task, assign, toast, onDone }) {
   const [expanded, setExpanded] = useState(false)
-  const [pwLoading, setPwLoading] = useState(false)
 
   const statusColor = m.status==='approved' ? '#7DF9AA' : m.status==='rejected' ? '#FF6B6B' : '#FFD93D'
   const statusBg    = m.status==='approved' ? 'rgba(125,249,170,.1)' : m.status==='rejected' ? 'rgba(255,107,107,.1)' : 'rgba(255,217,61,.1)'
-
-  const sendResetEmail = async () => {
-    if(!confirm(`Send password reset email to ${m.name}?\n\nWill be sent to: ${m.email}`)) return
-    setPwLoading(true)
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(m.email, {
-        redirectTo: 'https://maniyara.pages.dev/reset-password'
-      })
-      if(error) throw error
-      toast(`📧 Reset email sent to ${m.name}!`)
-    } catch(e) { toast('Failed: '+e.message,'error') }
-    finally { setPwLoading(false) }
-  }
 
   return (
     <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:16,marginBottom:12,overflow:'hidden',transition:'border-color .2s'}}>
@@ -356,17 +342,7 @@ function MemberCard({ m, task, assign, toast, onDone }) {
         </div>
       </div>
 
-      {/* ── PASSWORD RESET ROW (always visible) ── */}
-      <div style={{margin:'0 14px 12px',background:'rgba(123,97,255,.07)',border:'1px solid rgba(123,97,255,.18)',borderRadius:10,padding:'10px 12px',display:'flex',alignItems:'center',gap:10}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:10,fontWeight:700,color:'#A78BFA',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:1}}>🔑 Password Reset</div>
-          <div style={{fontSize:11,color:'#4a5070',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.email}</div>
-        </div>
-        <button onClick={sendResetEmail} disabled={pwLoading}
-          style={{padding:'7px 13px',borderRadius:8,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap',border:'1px solid rgba(123,97,255,.3)',background:'rgba(123,97,255,.1)',color:'#A78BFA',opacity:pwLoading?0.5:1,transition:'all .15s'}}>
-          {pwLoading ? '⏳...' : '📧 Send Reset'}
-        </button>
-      </div>
+
 
       {/* ── EXPANDABLE EDIT PANEL ── */}
       {expanded && (
