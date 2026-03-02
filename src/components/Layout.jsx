@@ -35,18 +35,17 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
 
   const showDash     = siteSettings?.page_dashboard !== false
   const showTask     = siteSettings?.page_mytask    !== false
-  const showMembers  = false // merged into Dashboard
   const showExpenses = siteSettings?.page_expenses  !== false
   const showFund     = siteSettings?.page_fund      !== false
 
   const links = [
-    ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',     short:'Home',  end:true }] : []),
-    ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task',  short:'Task'  }] : []),
-    ...(showMembers  ? [{ to:'/members',  icon:'◈',  label:'Members',  short:'Crew'  }] : []),
-    ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses', short:'Money' }] : []),
-    ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',     short:'Fund'  }] : []),
+    ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',    short:'Home',   end:true }] : []),
+    ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task', short:'Task'   }] : []),
+    ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses',short:'Money'  }] : []),
+    ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
     ...(isTaskAssigner && !profile?.is_admin ? [{ to:'/assign', icon:'📋', label:'Assign', short:'Assign' }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
+    { to:'/profile', icon:'👤', label:'Profile', short:'Me' },
   ]
 
   const lnkStyle = (active) => ({
@@ -72,7 +71,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
 
       {/* ── DESKTOP SIDEBAR + MAIN ── */}
       <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1}}>
-        {/* Sidebar — hidden on mobile via CSS */}
         <aside className="sidebar" style={{width:236,flexShrink:0,position:'sticky',top:54,height:'calc(100vh - 54px)',overflowY:'auto',background:'rgba(9,10,20,.98)',borderRight:'1px solid rgba(125,249,170,.09)',padding:'18px 12px',display:'flex',flexDirection:'column',gap:3,boxShadow:'3px 0 28px rgba(0,0,0,.5)'}}>
           <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#7DF9AA,#FF6B9D,transparent)'}}/>
 
@@ -92,16 +90,20 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
             <div style={{fontFamily:'Orbitron,monospace',fontSize:11,color:'#FFD93D',letterSpacing:.5}}>{cd}</div>
           </div>
 
-          {/* Profile */}
-          {profile && (
-            <div style={{display:'flex',alignItems:'center',gap:10,background:'#131525',border:'1px solid rgba(125,249,170,.09)',borderRadius:9,padding:'9px 11px',marginBottom:8}}>
-              <div style={{width:32,height:32,borderRadius:'50%',background:profile.color||'#7DF9AA',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{profile.avatar||'🧑'}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile.name}</div>
-                <div style={{fontSize:10,color:profile.is_admin?'#7DF9AA':'#8890b0',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em'}}>{profile.is_admin?'⚙ Admin':'Member'}</div>
-              </div>
+          {/* Profile preview — clickable, goes to /profile */}
+          <NavLink to="/profile" style={({isActive})=>({
+            display:'flex',alignItems:'center',gap:10,
+            background:isActive?'rgba(125,249,170,.08)':'#131525',
+            border:`1px solid ${isActive?'rgba(125,249,170,.25)':'rgba(125,249,170,.09)'}`,
+            borderRadius:9,padding:'9px 11px',marginBottom:8,textDecoration:'none',transition:'all .15s'
+          })}>
+            <div style={{width:32,height:32,borderRadius:'50%',background:profile?.color||'#7DF9AA',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{profile?.avatar||'🧑'}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name}</div>
+              <div style={{fontSize:10,color:profile?.is_admin?'#7DF9AA':'#8890b0',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em'}}>{profile?.is_admin?'⚙ Admin':'👤 Member'}</div>
             </div>
-          )}
+            <span style={{fontSize:11,color:'#4a5070'}}>›</span>
+          </NavLink>
 
           <nav style={{display:'flex',flexDirection:'column',gap:2,flex:1}}>
             {links.map(l => (
@@ -111,12 +113,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
               </NavLink>
             ))}
           </nav>
-
-          <button onClick={doSignOut} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:9,fontSize:13,fontWeight:600,color:'#4a5070',background:'transparent',border:'none',cursor:'pointer',transition:'all .2s',width:'100%',fontFamily:'Rajdhani,sans-serif',marginTop:'auto'}}
-            onMouseEnter={e=>{e.currentTarget.style.color='#FF6B6B';e.currentTarget.style.background='rgba(255,107,107,.08)'}}
-            onMouseLeave={e=>{e.currentTarget.style.color='#4a5070';e.currentTarget.style.background='transparent'}}>
-            <span style={{fontSize:17,width:22,textAlign:'center'}}>⏻</span><span>Sign Out</span>
-          </button>
         </aside>
 
         {/* Main content */}
@@ -135,10 +131,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
             <span>{l.short}</span>
           </NavLink>
         ))}
-        <button className="mob-nb" onClick={doSignOut}>
-          <span style={{fontSize:21,lineHeight:1}}>⏻</span>
-          <span>Out</span>
-        </button>
       </nav>
 
       <style>{`
