@@ -213,18 +213,13 @@ function CommonFundContent() {
                 style={{...inp,fontSize:'15px'}}/>
             </div>
           </div>
-          <div style={{marginBottom:14}}>
-            <label style={lbl}>Treasurer (can add/edit transactions)</label>
-            <select value={stForm.treasurer_id||''} onChange={e=>setStForm(f=>({...f,treasurer_id:e.target.value}))}
-              style={{...inp,padding:'10px 13px',fontSize:'15px'}}>
-              <option value="">— None (admin only) —</option>
-              {members.map(m=><option key={m.id} value={m.id}>{m.name} (@{m.username})</option>)}
-            </select>
+          <div style={{fontSize:11,color:'#8890b0',marginBottom:12,padding:'8px 12px',background:'rgba(255,217,61,.05)',borderRadius:8,border:'1px solid rgba(255,217,61,.1)'}}>
+            💡 To assign a Treasurer, go to <strong style={{color:'#FFD93D'}}>Admin → Approvals → Assign Roles</strong>
           </div>
           <button onClick={async()=>{
             setStSaving(true)
             try {
-              await updateFundSettings({ monthly_target:+stForm.monthly_target, low_balance_alert:+stForm.low_balance_alert, treasurer_id:stForm.treasurer_id||null })
+              await updateFundSettings({ monthly_target:+stForm.monthly_target, low_balance_alert:+stForm.low_balance_alert })
               toast('Fund settings saved ✅'); load(); setShowSettings(false)
             } catch(e) { toast('Failed: '+e.message,'error') }
             finally { setStSaving(false) }
