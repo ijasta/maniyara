@@ -2,8 +2,34 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+const PROXY_URL         = import.meta.env.VITE_SUPABASE_PROXY_URL
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Simple reliable proxy — rewrites supabase.co calls through Cloudflare Worker
+// Fixes Jio mobile data blocking of supabase.co
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  ...(PROXY_URL ? {
+    global: {
+      fetch: (url, options) => {
+        const urlStr = url instanceof Request ? url.url : String(url)
+        if (PROXY_URL && urlStr.includes('supabase.co')) {
+          const proxied = urlStr.replace(SUPABASE_URL, PROXY_URL)
+          const newOptions = { ...options }
+          // Preserve headers but ensure apikey is always sent
+          if (newOptions.headers) {
+            if (newOptions.headers instanceof Headers) {
+              newOptions.headers = Object.fromEntries(newOptions.headers.entries())
+            }
+          } else {
+            newOptions.headers = {}
+          }
+          newOptions.headers['apikey'] = SUPABASE_ANON_KEY
+          return fetch(proxied, newOptions)
+        }
+        return fetch(url, options)
+      }
+    }
+  } : {})
+})
 export const COLORS  = ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#C77DFF','#FF9A3C','#00D4AA']
 export const AVATARS = ['🧔','👦','🧑','👨','🙍','🧒','👩','🧕','👱','🧑‍🦱']
 
