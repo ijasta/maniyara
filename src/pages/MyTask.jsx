@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/AuthContext'
-import { getMyAssignment, markTaskDone } from '../lib/supabase'
+import { supabase, getMyAssignment, markTaskDone } from '../lib/supabase'
 import { StatusBadge, Btn, SecHead, ToastProvider, useToast } from '../components/UI'
 
 function MyTaskContent() {
   const { user, profile } = useAuth()
   const toast = useToast()
-  const [assignment, setAss] = useState(null)
-  const [loading,  setLd]    = useState(true)
-  const [submitting,setSub]  = useState(false)
-  const [proof,    setProof] = useState(null)
+  const [assignment, setAss]   = useState(null)
+  const [loading,    setLd]    = useState(true)
+  const [submitting, setSub]   = useState(false)
+  const [proof,      setProof] = useState(null)
+  const [viewLoading,setVL]    = useState(false)
   const fileRef = useRef()
 
   useEffect(() => { load() }, [user])
@@ -36,6 +37,34 @@ function MyTaskContent() {
       load()
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setSub(false) }
+  }
+
+  // Opens proof photo in new tab using a fresh signed URL (avoids expired token issue)
+  const viewProof = async () => {
+    if (!assignment?.proof_url) return
+    setVL(true)
+    try {
+      // Extract the storage path from the full URL
+      // Supabase URLs look like: .../storage/v1/object/public/BUCKET/path/to/file.jpg
+      const url = assignment.proof_url
+      const match = url.match(/\/object\/(?:public|sign)\/([^?]+)/)
+      if (!match) throw new Error('Could not parse photo URL')
+
+      const fullPath = match[1] // e.g. "task-proofs/userid/filename.jpg"
+      const bucket   = fullPath.split('/')[0]
+      const filePath = fullPath.split('/').slice(1).join('/')
+
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 3600) // valid for 1 hour
+
+      if (error) throw error
+      window.open(data.signedUrl, '_blank')
+    } catch(e) {
+      // Fallback: try opening the original URL directly
+      window.open(assignment.proof_url, '_blank')
+      toast('Opening photo...', 'warn')
+    } finally { setVL(false) }
   }
 
   const task = assignment?.tasks
@@ -65,7 +94,7 @@ function MyTaskContent() {
             <div style={{fontFamily:'Orbitron,monospace',fontSize:22,fontWeight:700,color:task.color,marginBottom:8}}>{task.name}</div>
             <div style={{fontSize:14,color:'#8890b0',lineHeight:1.65,marginBottom:14}}>{task.description}</div>
 
-            {/* Big status */}
+            {/* Status badge */}
             <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 18px',borderRadius:99,fontWeight:900,fontSize:14,
               background:assignment.done?'rgba(125,249,170,.15)':'rgba(255,217,61,.1)',
               border:`2px solid ${assignment.done?'#7DF9AA':'#FFD93D'}`,
@@ -80,10 +109,38 @@ function MyTaskContent() {
               </div>
             )}
 
+            {/* PROOF PHOTO — button instead of broken img */}
             {assignment.proof_url && (
-              <div style={{marginTop:14}}>
-                <img src={assignment.proof_url} alt="proof" style={{width:'100%',borderRadius:9,border:'1px solid rgba(125,249,170,.2)',maxHeight:200,objectFit:'cover'}}/>
-                <div style={{fontSize:11,color:'#4a5070',marginTop:6}}>📸 Proof photo submitted</div>
+              <div style={{marginTop:16}}>
+                <button
+                  onClick={viewProof}
+                  disabled={viewLoading}
+                  style={{
+                    width:'100%',
+                    padding:'14px 16px',
+                    borderRadius:11,
+                    border:'1px solid rgba(125,249,170,.3)',
+                    background:'rgba(125,249,170,.07)',
+                    color:'#7DF9AA',
+                    fontFamily:'Rajdhani,sans-serif',
+                    fontWeight:700,
+                    fontSize:14,
+                    cursor:'pointer',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:10,
+                    letterSpacing:'.04em',
+                    transition:'all .15s',
+                    opacity: viewLoading ? 0.6 : 1,
+                  }}>
+                  <span style={{fontSize:22}}>📸</span>
+                  <div style={{textAlign:'left'}}>
+                    <div>{viewLoading ? 'Opening...' : 'View Proof Photo'}</div>
+                    <div style={{fontSize:11,color:'#4a5070',fontWeight:400,marginTop:1}}>Opens in new tab</div>
+                  </div>
+                  <span style={{marginLeft:'auto',fontSize:16,opacity:.5}}>→</span>
+                </button>
               </div>
             )}
           </div>
@@ -105,9 +162,9 @@ function MyTaskContent() {
                   onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(125,249,170,.2)'}>
                   <span style={{fontSize:32,display:'block',marginBottom:7}}>📸</span>
                   <div style={{fontWeight:700,fontSize:14,marginBottom:3}}>Tap to take / upload photo</div>
-                  <div style={{fontSize:12,color:'#4a5070'}}>JPG · PNG · Max 5MB</div>
+                  <div style={{fontSize:12,color:'#4a5070'}}>JPG · PNG · Max 50MB</div>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
+                <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleFile}/>
 
                 {proof && (
                   <div style={{marginBottom:12}}>
