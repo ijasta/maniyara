@@ -236,6 +236,28 @@ function AdminContent() {
                   </div>
                 </div>
               </div>
+              {/* PASSWORD RESET */}
+<div style={{background:'rgba(123,97,255,.07)',border:'1px solid rgba(123,97,255,.2)',borderRadius:10,padding:'11px 13px',marginBottom:11,display:'flex',alignItems:'center',gap:10}}>
+  <div style={{flex:1,minWidth:0}}>
+    <div style={{fontSize:10,fontWeight:700,color:'#7B61FF',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:2}}>🔑 Password</div>
+    <div style={{fontSize:11,color:'#4a5070'}}>Send reset link to {m.email}</div>
+  </div>
+  <button onClick={async()=>{
+    if(!confirm(`Send password reset email to ${m.name}?\n\nLink will be sent to:\n${m.email}`)) return
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(m.email, {
+        redirectTo: window.location.origin + '/#/reset-password'
+      })
+      if(error) throw error
+      toast(`📧 Reset email sent to ${m.name}!`)
+    } catch(e) { toast('Failed: '+e.message,'error') }
+  }}
+    style={{padding:'8px 14px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,
+      fontSize:12,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap',
+      border:'1px solid rgba(123,97,255,.35)',background:'rgba(123,97,255,.12)',color:'#A78BFA'}}>
+    📧 Send Reset Email
+  </button>
+</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:11}}>
                 {[['Name',m.name,'name','text'],['Phone',m.phone,'phone','tel']].map(([lb,val,key,type])=>(
                   <div key={key} style={{gridColumn:key==='name'?'1/-1':undefined}}>
