@@ -246,7 +246,7 @@ function AdminContent() {
     if(!confirm(`Send password reset email to ${m.name}?\n\nLink will be sent to:\n${m.email}`)) return
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(m.email, {
-        redirectTo: window.location.origin + '/#/reset-password'
+        redirectTo: 'https://maniyara.pages.dev/#/reset-password'
       })
       if(error) throw error
       toast(`📧 Reset email sent to ${m.name}!`)
