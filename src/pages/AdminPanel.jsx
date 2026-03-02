@@ -110,6 +110,111 @@ function AdminContent() {
               </div>
             </div>
           ))}
+
+          {/* ── ROLE ASSIGNMENT ── */}
+          <SecHead title="🎖️ Assign Roles"/>
+          <div style={{fontSize:12,color:'#8890b0',marginBottom:12,lineHeight:1.6}}>
+            Assigned members get extra permissions and a dedicated nav tab.
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+
+            {/* Task Assigner */}
+            <div style={{background:'#0d0e1a',border:`2px solid ${settings?.task_assigner_id?'rgba(125,249,170,.3)':'rgba(125,249,170,.1)'}`,borderRadius:13,padding:14,transition:'border-color .2s'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <div style={{width:40,height:40,borderRadius:10,background:'rgba(125,249,170,.1)',
+                  border:'1px solid rgba(125,249,170,.2)',display:'flex',alignItems:'center',
+                  justifyContent:'center',fontSize:22,flexShrink:0}}>📋</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:'#E8F0FF'}}>Task Assigner</div>
+                  <div style={{fontSize:11,color:'#8890b0',marginTop:1}}>Assigns & rotates weekly tasks for all members</div>
+                </div>
+                {settings?.task_assigner_id ? (
+                  <div style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                    background:'rgba(125,249,170,.12)',border:'1px solid rgba(125,249,170,.25)',color:'#7DF9AA'}}>
+                    ✅ ACTIVE
+                  </div>
+                ) : (
+                  <div style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                    background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',color:'#4a5070'}}>
+                    NOT SET
+                  </div>
+                )}
+              </div>
+              {settings?.task_assigner_id && (() => {
+                const m = members.find(x=>x.id===settings.task_assigner_id)
+                return m ? (
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'rgba(125,249,170,.06)',borderRadius:8,marginBottom:10}}>
+                    <Avatar emoji={m.avatar} color={m.color} size={26}/>
+                    <span style={{fontSize:13,fontWeight:700,color:'#7DF9AA'}}>{m.name}</span>
+                    <span style={{fontSize:11,color:'#4a5070',marginLeft:'auto'}}>Current assigner</span>
+                  </div>
+                ) : null
+              })()}
+              <select key={`ta-${settings?.task_assigner_id}`}
+                defaultValue={settings?.task_assigner_id||''}
+                onChange={async e=>{
+                  await updateSettings({task_assigner_id: e.target.value||null})
+                  toast(e.target.value?'Task Assigner assigned ✅':'Task Assigner removed','warn')
+                  load()
+                }}
+                style={{...inp,padding:'10px 13px',width:'100%'}}>
+                <option value="">— None (admin only) —</option>
+                {members.filter(m=>m.status==='approved'&&!m.is_admin).map(m=>(
+                  <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fund Treasurer */}
+            <div style={{background:'#0d0e1a',border:`2px solid ${settings?.treasurer_id?'rgba(255,217,61,.3)':'rgba(255,217,61,.1)'}`,borderRadius:13,padding:14,transition:'border-color .2s'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,217,61,.08)',
+                  border:'1px solid rgba(255,217,61,.2)',display:'flex',alignItems:'center',
+                  justifyContent:'center',fontSize:22,flexShrink:0}}>🏦</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:'#E8F0FF'}}>Fund Treasurer</div>
+                  <div style={{fontSize:11,color:'#8890b0',marginTop:1}}>Manages common fund — add/edit transactions</div>
+                </div>
+                {settings?.treasurer_id ? (
+                  <div style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                    background:'rgba(255,217,61,.12)',border:'1px solid rgba(255,217,61,.25)',color:'#FFD93D'}}>
+                    ✅ ACTIVE
+                  </div>
+                ) : (
+                  <div style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                    background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',color:'#4a5070'}}>
+                    NOT SET
+                  </div>
+                )}
+              </div>
+              {settings?.treasurer_id && (() => {
+                const m = members.find(x=>x.id===settings.treasurer_id)
+                return m ? (
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'rgba(255,217,61,.06)',borderRadius:8,marginBottom:10}}>
+                    <Avatar emoji={m.avatar} color={m.color} size={26}/>
+                    <span style={{fontSize:13,fontWeight:700,color:'#FFD93D'}}>{m.name}</span>
+                    <span style={{fontSize:11,color:'#4a5070',marginLeft:'auto'}}>Current treasurer</span>
+                  </div>
+                ) : null
+              })()}
+              <select key={`tr-${settings?.treasurer_id}`}
+                defaultValue={settings?.treasurer_id||''}
+                onChange={async e=>{
+                  await updateSettings({treasurer_id: e.target.value||null})
+                  toast(e.target.value?'Treasurer assigned ✅':'Treasurer removed','warn')
+                  load()
+                }}
+                style={{...inp,padding:'10px 13px',width:'100%'}}>
+                <option value="">— None (admin only) —</option>
+                {members.filter(m=>m.status==='approved'&&!m.is_admin).map(m=>(
+                  <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
+                ))}
+              </select>
+            </div>
+
+          </div>
         </div>
       )}
 
@@ -265,8 +370,6 @@ function WhatsAppTab({ members, assigns, week, toast }) {
   const [msgTemplate, setMsgTemplate] = useState(
     `🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`
   )
-  const [sending, setSending] = useState(false)
-  const [sentCount, setSentCount] = useState(0)
 
   const buildMsg = (member) => {
     const a = assigns.find(x => x.member_id === member.id || x.members?.id === member.id)
@@ -276,94 +379,154 @@ function WhatsAppTab({ members, assigns, week, toast }) {
       .replace('{task}', t ? `${t.emoji} ${t.name}` : 'No task assigned yet')
   }
 
-  // Open all WhatsApp links one by one with delay
-  const sendToAll = async () => {
-    setSending(true)
-    setSentCount(0)
-    for (let i = 0; i < approved.length; i++) {
-      const m = approved[i]
-      const link = buildWALink(m.phone, buildMsg(m))
-      window.open(link, '_blank')
-      setSentCount(i + 1)
-      // Small delay so browser doesn't block popups
-      await new Promise(r => setTimeout(r, 800))
+  const [queueMode, setQueueMode] = useState(false)
+  const [queueIdx,  setQueueIdx]  = useState(0)
+  const [sent,      setSent]      = useState([])
+
+  const startQueue = () => { setQueueMode(true); setQueueIdx(0); setSent([]) }
+  const stopQueue  = () => { setQueueMode(false); setQueueIdx(0); setSent([]) }
+
+  const currentMember = approved[queueIdx]
+
+  const sendCurrent = () => {
+    const link = buildWALink(currentMember.phone, buildMsg(currentMember))
+    window.open(link, '_blank')
+    setSent(s => [...s, currentMember.id])
+    if (queueIdx < approved.length - 1) {
+      setQueueIdx(i => i + 1)
+    } else {
+      toast(`✅ Sent to all ${approved.length} members!`)
+      stopQueue()
     }
-    setSending(false)
-    toast(`✅ Opened WhatsApp for all ${approved.length} members!`)
   }
 
   return (
     <div>
-      {/* ── BROADCAST BUTTON ── */}
-      <div style={{background:'linear-gradient(135deg,rgba(37,211,102,.1),rgba(37,211,102,.05))',
-        border:'2px solid rgba(37,211,102,.3)',borderRadius:14,padding:18,marginBottom:16,textAlign:'center'}}>
-        <div style={{fontSize:36,marginBottom:8}}>📢</div>
-        <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:800,color:'#25D366',letterSpacing:1,marginBottom:4}}>
-          BROADCAST TO ALL
-        </div>
-        <div style={{fontSize:12,color:'#8890b0',marginBottom:16,lineHeight:1.6}}>
-          Opens WhatsApp for all {approved.length} members at once with their task info
-        </div>
-        <button onClick={sendToAll} disabled={sending}
-          style={{width:'100%',padding:'15px',borderRadius:12,border:'none',cursor:sending?'not-allowed':'pointer',
-            background:sending?'#1a2030':'linear-gradient(135deg,#25D366,#128C7E)',
-            color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,
-            letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.3)',
-            opacity:sending?0.7:1,transition:'all .15s'}}>
-          {sending
-            ? `⏳ Opening... ${sentCount}/${approved.length}`
-            : `📱 Send to All ${approved.length} Members`}
-        </button>
-        {sending && (
-          <div style={{marginTop:10,fontSize:11,color:'#25D366'}}>
-            Allow popups if browser asks — each member opens in a new tab
-          </div>
-        )}
-      </div>
-
-      {/* ── MESSAGE TEMPLATE ── */}
-      <SecHead title="📝 Message Template"/>
-      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        <div style={{fontSize:11,color:'#8890b0',marginBottom:10,lineHeight:1.6}}>
-          Use <span style={{color:'#7DF9AA',fontWeight:700}}>{'{name}'}</span> and <span style={{color:'#7DF9AA',fontWeight:700}}>{'{task}'}</span> — they get replaced with each member's actual info.
-        </div>
-        <textarea value={msgTemplate} onChange={e=>setMsgTemplate(e.target.value)}
-          rows={7} style={{...inp,width:'100%',resize:'vertical',fontSize:13,lineHeight:1.7}}/>
-        <button onClick={()=>setMsgTemplate(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)}
-          style={{marginTop:9,padding:'7px 14px',borderRadius:8,border:'1px solid rgba(125,249,170,.2)',
-            background:'transparent',color:'#7DF9AA',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Rajdhani,sans-serif'}}>
-          ↺ Reset to Default
-        </button>
-      </div>
-
-      {/* ── INDIVIDUAL SENDS ── */}
-      <SecHead title="📱 Send Individually"/>
-      <div style={{display:'flex',flexDirection:'column',gap:9}}>
-        {approved.map(m => {
-          const a = assigns.find(x => x.member_id === m.id || x.members?.id === m.id)
-          const t = a?.tasks
-          return (
-            <div key={m.id} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',
-              borderRadius:13,padding:13,display:'flex',alignItems:'center',gap:10}}>
-              <Avatar emoji={m.avatar} color={m.color} size={38}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
-                <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
-                  {t ? `${t.emoji} ${t.name}` : '⚠️ No task assigned'}
-                </div>
-              </div>
-              <a href={buildWALink(m.phone, buildMsg(m))} target="_blank" rel="noreferrer"
-                style={{textDecoration:'none',flexShrink:0}}>
-                <button style={{padding:'9px 14px',borderRadius:9,border:'1px solid rgba(37,211,102,.3)',
-                  background:'rgba(37,211,102,.1)',color:'#25D366',fontFamily:'Rajdhani,sans-serif',
-                  fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'}}>
-                  📱 Send
-                </button>
-              </a>
+      {/* ── QUEUE MODE ── */}
+      {queueMode ? (
+        <div>
+          {/* Progress */}
+          <div style={{background:'rgba(37,211,102,.07)',border:'2px solid rgba(37,211,102,.3)',
+            borderRadius:14,padding:16,marginBottom:14,textAlign:'center'}}>
+            <div style={{fontSize:11,fontWeight:700,color:'#25D366',textTransform:'uppercase',
+              letterSpacing:'.1em',marginBottom:6}}>
+              SENDING {queueIdx + 1} of {approved.length}
             </div>
-          )
-        })}
-      </div>
+            {/* Progress bar */}
+            <div style={{background:'rgba(255,255,255,.08)',borderRadius:99,height:6,marginBottom:14,overflow:'hidden'}}>
+              <div style={{height:'100%',borderRadius:99,background:'linear-gradient(90deg,#25D366,#128C7E)',
+                width:`${((queueIdx)/approved.length)*100}%`,transition:'width .3s'}}/>
+            </div>
+            {/* Sent list */}
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:14}}>
+              {approved.map((m,i) => (
+                <div key={m.id} style={{fontSize:11,padding:'3px 10px',borderRadius:99,fontWeight:700,
+                  background: sent.includes(m.id) ? 'rgba(37,211,102,.15)' : i===queueIdx ? 'rgba(255,217,61,.15)' : 'rgba(255,255,255,.05)',
+                  border: `1px solid ${sent.includes(m.id) ? 'rgba(37,211,102,.3)' : i===queueIdx ? 'rgba(255,217,61,.3)' : 'rgba(255,255,255,.08)'}`,
+                  color: sent.includes(m.id) ? '#25D366' : i===queueIdx ? '#FFD93D' : '#4a5070'}}>
+                  {sent.includes(m.id) ? '✅' : i===queueIdx ? '👉' : '⏳'} {m.name}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Current member card */}
+          {currentMember && (
+            <div style={{background:'#0d0e1a',border:'2px solid rgba(255,217,61,.25)',
+              borderRadius:14,padding:16,marginBottom:14,textAlign:'center'}}>
+              <Avatar emoji={currentMember.avatar} color={currentMember.color} size={56}/>
+              <div style={{fontWeight:800,fontSize:18,marginTop:10,marginBottom:4}}>{currentMember.name}</div>
+              <div style={{fontSize:12,color:'#8890b0',marginBottom:16}}>
+                {(() => { const a=assigns.find(x=>x.member_id===currentMember.id||x.members?.id===currentMember.id); const t=a?.tasks; return t?`${t.emoji} ${t.name}`:'⚠️ No task assigned' })()}
+              </div>
+              <button onClick={sendCurrent}
+                style={{width:'100%',padding:16,borderRadius:12,border:'none',cursor:'pointer',
+                  background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',
+                  fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',
+                  boxShadow:'0 4px 20px rgba(37,211,102,.35)'}}>
+                📱 Send to {currentMember.name} →
+              </button>
+              <div style={{fontSize:11,color:'#4a5070',marginTop:8}}>
+                Tap → opens WhatsApp → come back → tap next member
+              </div>
+            </div>
+          )}
+
+          <button onClick={stopQueue}
+            style={{width:'100%',padding:12,borderRadius:10,border:'1px solid rgba(255,107,107,.25)',
+              background:'rgba(255,107,107,.07)',color:'#FF6B6B',fontFamily:'Rajdhani,sans-serif',
+              fontWeight:700,fontSize:13,cursor:'pointer'}}>
+            ✕ Stop Broadcast
+          </button>
+        </div>
+
+      ) : (
+        <div>
+          {/* ── START BROADCAST ── */}
+          <div style={{background:'linear-gradient(135deg,rgba(37,211,102,.1),rgba(37,211,102,.05))',
+            border:'2px solid rgba(37,211,102,.3)',borderRadius:14,padding:18,marginBottom:16,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:8}}>📢</div>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:800,color:'#25D366',
+              letterSpacing:1,marginBottom:6}}>BROADCAST TO ALL</div>
+            <div style={{fontSize:12,color:'#8890b0',marginBottom:16,lineHeight:1.7}}>
+              Guides you through sending WhatsApp to each member one by one.<br/>
+              Tap Send → WhatsApp opens → come back → next member automatically.
+            </div>
+            <button onClick={startQueue}
+              style={{width:'100%',padding:'15px',borderRadius:12,border:'none',cursor:'pointer',
+                background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',
+                fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',
+                boxShadow:'0 4px 20px rgba(37,211,102,.3)'}}>
+              📱 Start Broadcast — {approved.length} Members
+            </button>
+          </div>
+
+          {/* ── MESSAGE TEMPLATE ── */}
+          <SecHead title="📝 Message Template"/>
+          <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+            <div style={{fontSize:11,color:'#8890b0',marginBottom:10,lineHeight:1.6}}>
+              Use <span style={{color:'#7DF9AA',fontWeight:700}}>{'{name}'}</span> and <span style={{color:'#7DF9AA',fontWeight:700}}>{'{task}'}</span> — replaced with each member's actual info.
+            </div>
+            <textarea value={msgTemplate} onChange={e=>setMsgTemplate(e.target.value)}
+              rows={7} style={{...inp,width:'100%',resize:'vertical',fontSize:13,lineHeight:1.7}}/>
+            <button onClick={()=>setMsgTemplate(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)}
+              style={{marginTop:9,padding:'7px 14px',borderRadius:8,border:'1px solid rgba(125,249,170,.2)',
+                background:'transparent',color:'#7DF9AA',fontSize:12,fontWeight:700,cursor:'pointer',
+                fontFamily:'Rajdhani,sans-serif'}}>
+              ↺ Reset to Default
+            </button>
+          </div>
+
+          {/* ── INDIVIDUAL SENDS ── */}
+          <SecHead title="📱 Send Individually"/>
+          <div style={{display:'flex',flexDirection:'column',gap:9}}>
+            {approved.map(m => {
+              const a = assigns.find(x => x.member_id === m.id || x.members?.id === m.id)
+              const t = a?.tasks
+              return (
+                <div key={m.id} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',
+                  borderRadius:13,padding:13,display:'flex',alignItems:'center',gap:10}}>
+                  <Avatar emoji={m.avatar} color={m.color} size={38}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
+                    <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
+                      {t ? `${t.emoji} ${t.name}` : '⚠️ No task assigned'}
+                    </div>
+                  </div>
+                  <a href={buildWALink(m.phone, buildMsg(m))} target="_blank" rel="noreferrer"
+                    style={{textDecoration:'none',flexShrink:0}}>
+                    <button style={{padding:'9px 14px',borderRadius:9,border:'1px solid rgba(37,211,102,.3)',
+                      background:'rgba(37,211,102,.1)',color:'#25D366',fontFamily:'Rajdhani,sans-serif',
+                      fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      📱 Send
+                    </button>
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
