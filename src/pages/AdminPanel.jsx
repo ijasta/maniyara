@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
+import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
   getTasks, addTask, updateTask, deleteTask,
   getCurrentAssignments, adminAssignTasks, rotateToNextWeek, deleteAssignment,
@@ -338,25 +338,152 @@ function AdminContent() {
 
       {/* ── LOGS ── */}
       {tab==='logs' && (
-        <div>
-          <SecHead title="Activity Log" badge={`${logs.length} entries`}/>
-          {logs.length===0 ? (
-            <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:40,textAlign:'center',color:'#4a5070'}}>No logs yet</div>
-          ) : (
-            <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,overflow:'hidden'}}>
-              {logs.map((l,i)=>(
-                <div key={l.id} style={{padding:'11px 13px',borderBottom:i<logs.length-1?'1px solid rgba(125,249,170,.06)':'none',display:'flex',gap:10,alignItems:'flex-start'}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700}}>{l.action}</div>
-                    {l.actor&&<div style={{fontSize:11,color:'#8890b0',marginTop:1}}>by {l.actor}</div>}
-                    {l.details&&<div style={{fontSize:11,color:'#4a5070',marginTop:1}}>{l.details}</div>}
-                  </div>
-                  <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0}}>{new Date(l.created_at).toLocaleString()}</div>
-                </div>
-              ))}
-            </div>
-          )}
+        <LogsTab logs={logs} members={members} onClear={async()=>{
+          if(!confirm('Clear all logs?')) return
+          try { await supabase.from('logs').delete().neq('id','00000000-0000-0000-0000-000000000000'); toast('Logs cleared 🗑️','warn'); load() }
+          catch(e) { toast('Failed: '+e.message,'error') }
+        }}/>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════
+// LOGS TAB
+// ══════════════════════════════════════════════════════════
+function LogsTab({ logs, members, onClear }) {
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+
+  const ACTION_TYPES = [
+    { key:'all',      label:'All',       color:'#7DF9AA' },
+    { key:'task',     label:'📋 Tasks',  color:'#4D96FF' },
+    { key:'member',   label:'👥 Members',color:'#C77DFF' },
+    { key:'expense',  label:'💸 Expenses',color:'#FF9A3C'},
+    { key:'fund',     label:'🏦 Fund',   color:'#FFD93D' },
+    { key:'auth',     label:'🔑 Auth',   color:'#FF6B6B' },
+  ]
+
+  const getActionType = (action='') => {
+    const a = action.toLowerCase()
+    if (a.includes('task') || a.includes('assign') || a.includes('rotat')) return 'task'
+    if (a.includes('member') || a.includes('approv') || a.includes('reject') || a.includes('register')) return 'member'
+    if (a.includes('expense') || a.includes('split') || a.includes('paid')) return 'expense'
+    if (a.includes('fund') || a.includes('transaction') || a.includes('treasurer')) return 'fund'
+    if (a.includes('login') || a.includes('signup') || a.includes('auth') || a.includes('sign')) return 'auth'
+    return 'other'
+  }
+
+  const getActionIcon = (action='') => {
+    const t = getActionType(action)
+    return { task:'📋', member:'👥', expense:'💸', fund:'🏦', auth:'🔑', other:'⚡' }[t]
+  }
+
+  const getActionColor = (action='') => {
+    const t = getActionType(action)
+    return { task:'#4D96FF', member:'#C77DFF', expense:'#FF9A3C', fund:'#FFD93D', auth:'#FF6B6B', other:'#7DF9AA' }[t]
+  }
+
+  const filtered = logs.filter(l => {
+    const matchFilter = filter === 'all' || getActionType(l.action) === filter
+    const matchSearch = !search || l.action?.toLowerCase().includes(search.toLowerCase())
+      || l.actor?.toLowerCase().includes(search.toLowerCase())
+      || l.details?.toLowerCase().includes(search.toLowerCase())
+    return matchFilter && matchSearch
+  })
+
+  const formatTime = (ts) => {
+    const d = new Date(ts)
+    const now = new Date()
+    const diff = now - d
+    if (diff < 60000)   return 'Just now'
+    if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`
+    if (diff < 86400000)return `${Math.floor(diff/3600000)}h ago`
+    if (diff < 604800000)return `${Math.floor(diff/86400000)}d ago`
+    return d.toLocaleDateString('en-IN', { day:'numeric', month:'short' })
+  }
+
+  return (
+    <div>
+      {/* Stats strip */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
+        {[
+          { label:'Total Logs', value:logs.length, color:'#7DF9AA' },
+          { label:'Today',      value:logs.filter(l=>new Date(l.created_at).toDateString()===new Date().toDateString()).length, color:'#4D96FF' },
+          { label:'This Week',  value:logs.filter(l=>Date.now()-new Date(l.created_at)<604800000).length, color:'#FFD93D' },
+        ].map(s=>(
+          <div key={s.label} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:11,padding:'11px 12px',textAlign:'center'}}>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:18,fontWeight:900,color:s.color}}>{s.value}</div>
+            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:2}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <input value={search} onChange={e=>setSearch(e.target.value)}
+        placeholder="🔍 Search logs..." style={{...inp,width:'100%',padding:'10px 13px',marginBottom:10}}/>
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+        {ACTION_TYPES.map(t=>(
+          <button key={t.key} onClick={()=>setFilter(t.key)}
+            style={{padding:'5px 12px',borderRadius:99,fontSize:11,fontWeight:700,cursor:'pointer',
+              border:`1px solid ${filter===t.key?t.color:'rgba(255,255,255,.08)'}`,
+              background:filter===t.key?`${t.color}18`:'transparent',
+              color:filter===t.key?t.color:'#4a5070',transition:'all .15s'}}>
+            {t.label} {t.key!=='all'?`(${logs.filter(l=>getActionType(l.action)===t.key).length})`:''}
+          </button>
+        ))}
+      </div>
+
+      {/* Log entries */}
+      {filtered.length===0 ? (
+        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,
+          padding:40,textAlign:'center',color:'#4a5070'}}>
+          <div style={{fontSize:32,marginBottom:8}}>📭</div>
+          No logs found
         </div>
+      ) : (
+        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,overflow:'hidden',marginBottom:14}}>
+          {filtered.map((l,i)=>(
+            <div key={l.id} style={{padding:'12px 14px',
+              borderBottom:i<filtered.length-1?'1px solid rgba(125,249,170,.05)':'none',
+              display:'flex',gap:11,alignItems:'flex-start'}}>
+              {/* Icon */}
+              <div style={{width:32,height:32,borderRadius:8,flexShrink:0,
+                background:`${getActionColor(l.action)}18`,
+                border:`1px solid ${getActionColor(l.action)}30`,
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,marginTop:1}}>
+                {getActionIcon(l.action)}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',lineHeight:1.4}}>{l.action}</div>
+                <div style={{display:'flex',gap:8,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
+                  {l.actor && (
+                    <span style={{fontSize:11,color:'#8890b0'}}>by <span style={{color:'#7DF9AA',fontWeight:700}}>{l.actor}</span></span>
+                  )}
+                  {l.details && (
+                    <span style={{fontSize:11,color:'#4a5070'}}>· {l.details}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0,marginTop:3}}>
+                {formatTime(l.created_at)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Clear button */}
+      {logs.length > 0 && (
+        <button onClick={onClear}
+          style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',
+            fontWeight:700,fontSize:13,cursor:'pointer',
+            border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',
+            color:'#FF6B6B',letterSpacing:'.04em'}}>
+          🗑️ Clear All Logs
+        </button>
       )}
     </div>
   )
@@ -1196,38 +1323,6 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
               style={{...inp,padding:'10px 13px'}}/>
           </div>
         ))}
-      </div>
-
-      {/* ── TASK ASSIGNER ROLE ── */}
-      <SecHead title="🎖️ Task Assigner Role"/>
-      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        <div style={{fontSize:12,color:'#8890b0',lineHeight:1.7,marginBottom:12}}>
-          Assign a member who can manage weekly task assignments and rotate tasks. They get a dedicated <strong style={{color:'#E8F0FF'}}>📋 Assign</strong> tab in their nav bar.
-        </div>
-        <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Select Task Assigner</label>
-        <select
-          key={settings?.task_assigner_id}
-          defaultValue={settings?.task_assigner_id||''}
-          onChange={async e=>{
-            await updateSettings({task_assigner_id: e.target.value||null})
-            toast(e.target.value?'Task Assigner assigned ✅':'Task Assigner removed','warn')
-            onDone()
-          }}
-          style={{...inp,padding:'10px 13px',width:'100%',marginBottom:10}}>
-          <option value="">— None (admin only) —</option>
-          {members.filter(m=>m.status==='approved'&&!m.is_admin).map(m=>(
-            <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
-          ))}
-        </select>
-        {settings?.task_assigner_id ? (
-          <div style={{fontSize:12,color:'#7DF9AA',padding:'8px 12px',background:'rgba(125,249,170,.07)',borderRadius:8,border:'1px solid rgba(125,249,170,.15)'}}>
-            ✅ Assigned member sees a <strong>📋 Assign</strong> tab in their nav and can assign + rotate tasks
-          </div>
-        ) : (
-          <div style={{fontSize:12,color:'#4a5070',padding:'8px 12px',background:'rgba(255,255,255,.03)',borderRadius:8,border:'1px solid rgba(255,255,255,.06)'}}>
-            No task assigner set — only admin can manage tasks
-          </div>
-        )}
       </div>
 
       {/* ── DANGER ZONE ── */}
