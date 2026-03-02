@@ -897,7 +897,6 @@ function SiteControlsTab({ settings, toast, onDone }) {
     maintenance_message: settings?.maintenance_message ?? "We are performing maintenance. Back soon! 🔧",
     page_dashboard:      settings?.page_dashboard      ?? true,
     page_mytask:         settings?.page_mytask         ?? true,
-    page_members:        settings?.page_members        ?? true,
     page_expenses:       settings?.page_expenses       ?? true,
     page_fund:           settings?.page_fund           ?? true,
   })
@@ -915,11 +914,10 @@ function SiteControlsTab({ settings, toast, onDone }) {
   }
 
   const PAGES = [
-    { key:'page_dashboard', label:'🏠 Home / Dashboard',    desc:'Main task overview page' },
-    { key:'page_mytask',    label:'✦ My Task',              desc:'Personal task & upload page' },
-    { key:'page_members',   label:'◈ Members / Crew',       desc:'Who done / pending page' },
-    { key:'page_expenses',  label:'💸 Expenses',            desc:'Split bill tracker' },
-    { key:'page_fund',      label:'🏦 Common Fund',         desc:'Shared house fund page' },
+    { key:'page_dashboard', label:'🏠 Home',        desc:'Main overview — crew + task status' },
+    { key:'page_mytask',    label:'✦ My Task',       desc:'Personal task & proof upload' },
+    { key:'page_expenses',  label:'💸 Expenses',     desc:'Split bill tracker' },
+    { key:'page_fund',      label:'🏦 Common Fund',  desc:'Shared house fund page' },
   ]
 
   return (
@@ -1023,13 +1021,13 @@ function SiteControlsTab({ settings, toast, onDone }) {
 
       {/* Quick actions */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:9, marginBottom:18}}>
-        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:true, page_members:true, page_expenses:true, page_fund:true}))}
+        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:true, page_expenses:true, page_fund:true}))}
           style={{padding:'10px', borderRadius:9, fontFamily:'Rajdhani,sans-serif', fontWeight:700,
             fontSize:12, cursor:'pointer', border:'1px solid rgba(125,249,170,.2)',
             background:'rgba(125,249,170,.07)', color:'#7DF9AA', letterSpacing:'.05em'}}>
           ✅ Enable All Pages
         </button>
-        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:false, page_members:false, page_expenses:false, page_fund:false}))}
+        <button onClick={()=>setForm(f=>({...f, page_dashboard:true, page_mytask:false, page_expenses:false, page_fund:false}))}
           style={{padding:'10px', borderRadius:9, fontFamily:'Rajdhani,sans-serif', fontWeight:700,
             fontSize:12, cursor:'pointer', border:'1px solid rgba(255,107,107,.2)',
             background:'rgba(255,107,107,.07)', color:'#FF6B6B', letterSpacing:'.05em'}}>
@@ -1302,7 +1300,9 @@ function ExpensesAdminTab({ toast, members }) {
 // SETTINGS TAB
 // ══════════════════════════════════════════════════════════
 function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks }) {
-  const [saving, setSaving] = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [weekEdit, setWeekEdit] = useState(week)
+  const [wSaving,  setWSaving]  = useState(false)
 
   const save = async (updates) => {
     setSaving(true)
@@ -1311,27 +1311,137 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
     finally { setSaving(false) }
   }
 
+  const saveWeek = async () => {
+    if (!weekEdit || weekEdit < 1) { toast('Invalid week number','warn'); return }
+    setWSaving(true)
+    try {
+      await supabase.from('settings').update({ current_week: +weekEdit }).eq('id', settings?.id || 1)
+      toast(`Week set to ${weekEdit} ✅`); onDone()
+    } catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setWSaving(false) }
+  }
+
   return (
     <div>
+
       {/* ── HOUSE INFO ── */}
-      <SecHead title="House Info"/>
+      <SecHead title="🏠 House Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        {[['House Name','house_name',settings?.house_name],['App Tagline','app_tagline',settings?.app_tagline]].map(([lb,key,val])=>(
+        {[
+          ['House Name',   'house_name',   settings?.house_name,   'e.g. Maniyara, The Den...'],
+          ['App Tagline',  'app_tagline',  settings?.app_tagline,  'e.g. Where legends live'],
+          ['House Address','house_address',settings?.house_address, 'Optional — for reference'],
+        ].map(([lb,key,val,ph])=>(
           <div key={key} style={{marginBottom:12}}>
             <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
-            <input type="text" defaultValue={val} onBlur={async e=>{ await save({[key]:e.target.value}) }}
+            <input type="text" defaultValue={val||''} placeholder={ph}
+              onBlur={async e=>{ if(e.target.value!==val) await save({[key]:e.target.value}) }}
               style={{...inp,padding:'10px 13px'}}/>
           </div>
         ))}
       </div>
 
+      {/* ── WEEK CONTROL ── */}
+      <SecHead title="📅 Week Control"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(77,150,255,.15)',borderRadius:13,padding:14,marginBottom:14}}>
+        <div style={{fontSize:12,color:'#8890b0',marginBottom:14,lineHeight:1.6}}>
+          Manually set the current week number. This affects task assignments and displays across the app.
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Current Week</label>
+            <input type="number" value={weekEdit} min={1}
+              onChange={e=>setWeekEdit(e.target.value)}
+              style={{...inp,padding:'12px 13px',fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:900,color:'#4D96FF',textAlign:'center'}}/>
+          </div>
+          <button onClick={saveWeek} disabled={wSaving}
+            style={{marginTop:20,padding:'12px 20px',borderRadius:10,fontFamily:'Rajdhani,sans-serif',
+              fontWeight:800,fontSize:13,cursor:'pointer',border:'none',
+              background:'linear-gradient(135deg,#4D96FF,#7B61FF)',
+              color:'#fff',opacity:wSaving?0.6:1}}>
+            {wSaving?'...':'Set Week'}
+          </button>
+        </div>
+        <div style={{display:'flex',gap:7}}>
+          {[-1,+1].map(d=>(
+            <button key={d} onClick={async()=>{
+              const nw = Math.max(1, +weekEdit + d)
+              setWeekEdit(nw)
+              setWSaving(true)
+              try { await supabase.from('settings').update({current_week:nw}).eq('id',settings?.id||1); toast(`Week ${d>0?'advanced':'rolled back'} → ${nw} ✅`); onDone() }
+              catch(e) { toast('Failed: '+e.message,'error') }
+              finally { setWSaving(false) }
+            }}
+              style={{flex:1,padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,
+                fontSize:13,cursor:'pointer',
+                border:`1px solid ${d>0?'rgba(125,249,170,.2)':'rgba(255,107,107,.2)'}`,
+                background:d>0?'rgba(125,249,170,.07)':'rgba(255,107,107,.07)',
+                color:d>0?'#7DF9AA':'#FF6B6B'}}>
+              {d>0?'⏩ Next Week':'⏪ Prev Week'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TASK SETTINGS ── */}
+      <SecHead title="📋 Task Settings"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        <div style={{fontSize:12,color:'#8890b0',marginBottom:12,lineHeight:1.6}}>
+          Weekly task stats for Week {week}.
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
+          {[
+            {label:'Total Tasks',  value:tasks?.filter(t=>t.active)?.length||0,  color:'#7DF9AA'},
+            {label:'Assigned',     value:assigns?.length||0,                      color:'#4D96FF'},
+            {label:'Completed',    value:assigns?.filter(a=>a.done)?.length||0,   color:'#FFD93D'},
+          ].map(s=>(
+            <div key={s.label} style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:10,padding:'10px',textAlign:'center'}}>
+              <div style={{fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:900,color:s.color}}>{s.value}</div>
+              <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:3}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <Btn variant="danger" full onClick={async()=>{if(!confirm(`Reset all done status for Week ${week}? Task assignments stay but everyone goes back to Pending.`)) return;await resetWeekDoneStatus(week);toast('Done status reset','warn');onDone()}}>
+          🔄 Reset Done Status (Keep Assignments)
+        </Btn>
+      </div>
+
+      {/* ── NOTIFICATIONS ── */}
+      <SecHead title="🔔 App Info"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        {[
+          ['App URL',       'app_url',       settings?.app_url,       'https://maniyara.pages.dev'],
+          ['Contact Email', 'contact_email', settings?.contact_email, 'admin@email.com'],
+        ].map(([lb,key,val,ph])=>(
+          <div key={key} style={{marginBottom:12}}>
+            <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
+            <input type="text" defaultValue={val||''} placeholder={ph}
+              onBlur={async e=>{ if(e.target.value!==val) await save({[key]:e.target.value}) }}
+              style={{...inp,padding:'10px 13px'}}/>
+          </div>
+        ))}
+        <div style={{fontSize:11,color:'#4a5070',lineHeight:1.6,padding:'8px 10px',background:'rgba(255,255,255,.02)',borderRadius:8,border:'1px solid rgba(255,255,255,.05)'}}>
+          💡 App URL is used in WhatsApp messages. Update it if you change hosting.
+        </div>
+      </div>
+
       {/* ── DANGER ZONE ── */}
-      <SecHead title="Danger Zone"/>
+      <SecHead title="⚠️ Danger Zone"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
+        <div style={{fontSize:12,color:'#8890b0',marginBottom:12,lineHeight:1.6}}>
+          These actions are irreversible. Be careful.
+        </div>
         <div style={{display:'flex',flexDirection:'column',gap:9}}>
-          <Btn variant="danger" full onClick={async()=>{if(!confirm(`Clear all assignments for Week ${week}?`)) return;await clearWeekAssignments(week);toast('Week cleared','warn');onDone()}}>🗑️ Clear This Week's Tasks</Btn>
-          <Btn variant="danger" full onClick={async()=>{if(!confirm('Delete ALL assignments ever?')) return;if(!confirm('Are you sure?')) return;await clearAllAssignments();toast('All cleared','warn');onDone()}}>☢️ Clear ALL Assignments Ever</Btn>
-          <Btn variant="ghost" full onClick={()=>{const d=JSON.stringify({members,tasks,assigns,settings},null,2);const a=document.createElement('a');a.href='data:text/json,'+encodeURIComponent(d);a.download='maniyara-backup.json';a.click();toast('Exported 📤')}}>📤 Export Data (JSON)</Btn>
+          <Btn variant="danger" full onClick={async()=>{if(!confirm(`Clear all assignments for Week ${week}?`)) return;await clearWeekAssignments(week);toast('Week cleared','warn');onDone()}}>🗑️ Clear This Week's Assignments</Btn>
+          <Btn variant="danger" full onClick={async()=>{if(!confirm('Delete ALL assignments ever?')) return;if(!confirm('This cannot be undone. Are you sure?')) return;await clearAllAssignments();toast('All cleared','warn');onDone()}}>☢️ Clear ALL Assignments Ever</Btn>
+          <Btn variant="ghost" full onClick={()=>{
+            const d=JSON.stringify({members,tasks,assigns,settings},null,2)
+            const a=document.createElement('a')
+            a.href='data:text/json,'+encodeURIComponent(d)
+            a.download=`maniyara-backup-week${week}.json`
+            a.click()
+            toast('Backup exported 📤')
+          }}>📤 Export Full Backup (JSON)</Btn>
         </div>
       </div>
     </div>
