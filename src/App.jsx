@@ -7,7 +7,7 @@ import AuthPage from './pages/AuthPage'
 import PendingPage from './pages/PendingPage'
 import Dashboard from './pages/Dashboard'
 import MyTask from './pages/MyTask'
-import Members from './pages/Members'
+
 import Expenses from './pages/Expenses'
 import CommonFund from './pages/CommonFund'
 import AdminPanel from './pages/AdminPanel'
@@ -59,7 +59,7 @@ export default function App() {
   const pages = {
     dashboard: siteSettings?.page_dashboard !== false,
     mytask:    siteSettings?.page_mytask    !== false,
-    members:   siteSettings?.page_members   !== false,
+    members:   false,
     expenses:  siteSettings?.page_expenses  !== false,
     fund:      siteSettings?.page_fund      !== false,
   }
@@ -74,7 +74,7 @@ export default function App() {
       <Route path="/" element={<Guard><Layout siteSettings={siteSettings} isTaskAssigner={isTaskAssigner}/></Guard>}>
         <Route index          element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
         <Route path="mytask"  element={<PageGuard enabled={pages.mytask}><MyTask /></PageGuard>} />
-        <Route path="members" element={<PageGuard enabled={pages.members}><Members /></PageGuard>} />
+
         <Route path="expenses"element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
         <Route path="fund"    element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
         <Route path="assign"  element={<Guard><TaskAssigner /></Guard>} />
