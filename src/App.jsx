@@ -8,7 +8,6 @@ import PendingPage from './pages/PendingPage'
 import Dashboard from './pages/Dashboard'
 import MyTask from './pages/MyTask'
 import ResetPassword from './pages/ResetPassword'
-
 import Expenses from './pages/Expenses'
 import CommonFund from './pages/CommonFund'
 import AdminPanel from './pages/AdminPanel'
@@ -65,23 +64,26 @@ export default function App() {
     fund:      siteSettings?.page_fund      !== false,
   }
 
-  // Task assigner: is current user the assigned task assigner?
   const isTaskAssigner = user && siteSettings?.task_assigner_id === user.id
 
   return (
     <Routes>
+      {/* ── PUBLIC — no auth needed ── */}
       <Route path="/auth" element={user && profile?.status === 'approved' ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/pending" element={<PendingPage />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      {/* HashRouter note: if using /#/ prefix, Supabase redirectTo must be https://maniyara.pages.dev/reset-password */}
+
+      {/* ── PROTECTED ── */}
       <Route path="/" element={<Guard><Layout siteSettings={siteSettings} isTaskAssigner={isTaskAssigner}/></Guard>}>
         <Route index          element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
         <Route path="mytask"  element={<PageGuard enabled={pages.mytask}><MyTask /></PageGuard>} />
-        <Route path="reset-password" element={<ResetPassword />} />
-
         <Route path="expenses"element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
         <Route path="fund"    element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
         <Route path="assign"  element={<Guard><TaskAssigner /></Guard>} />
         <Route path="admin"   element={<Guard adminOnly><AdminPanel onSettingsChange={()=>getSettings().then(setSiteSettings)}/></Guard>} />
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
