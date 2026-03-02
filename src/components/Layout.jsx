@@ -35,7 +35,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
 
   const showDash     = siteSettings?.page_dashboard !== false
   const showTask     = siteSettings?.page_mytask    !== false
-  const showMembers  = siteSettings?.page_members   !== false
+  const showMembers  = false // merged into Dashboard
   const showExpenses = siteSettings?.page_expenses  !== false
   const showFund     = siteSettings?.page_fund      !== false
 
