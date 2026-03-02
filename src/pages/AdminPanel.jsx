@@ -32,8 +32,11 @@ function AdminContent() {
         getPendingMembers(), getMembers(), getTasks(),
         getCurrentAssignments(), getSettings(), getLogs()
       ])
+      // Also fetch treasurer_id from fund_settings (it's NOT in settings table)
+      const { data: fs } = await supabase.from('fund_settings').select('treasurer_id').eq('id', 1).single()
+      const merged = { ...st, treasurer_id: fs?.treasurer_id ?? null }
       setPending(pend); setMembers(mem); setTasks(tk)
-      setAssigns(a); setSt(st); setLogs(lg); setWeek(w)
+      setAssigns(a); setSt(merged); setLogs(lg); setWeek(w)
     } catch(e) { toast('Load error: '+e.message,'error') }
     finally { setLoading(false) }
   }
@@ -178,13 +181,12 @@ function AdminContent() {
                 onChange={async e=>{
                   const val = e.target.value || null
                   try {
-                    // Save to BOTH settings and fund_settings to stay in sync
-                    await updateSettings({ treasurer_id: val })
-                    const { error } = await supabase.from('fund_settings').update({ treasurer_id: val }).eq('id', 1)
-                    if (error) {
-                      // fund_settings might use a different primary key — try upsert
-                      await supabase.from('fund_settings').upsert({ id: 1, treasurer_id: val })
-                    }
+                    // treasurer_id lives ONLY in fund_settings, NOT in settings table
+                    const { error } = await supabase
+                      .from('fund_settings')
+                      .update({ treasurer_id: val })
+                      .eq('id', 1)
+                    if (error) throw error
                     toast(val ? 'Treasurer assigned ✅' : 'Treasurer removed', 'warn')
                     load()
                   } catch(e) { toast('Failed: '+e.message,'error') }
