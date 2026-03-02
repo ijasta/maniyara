@@ -3,18 +3,24 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Cloudflare Worker proxy URL — fixes Jio/Airtel blocking of *.supabase.co
-// Set VITE_SUPABASE_PROXY_URL in Vercel/Netlify env vars after deploying the worker
+// Cloudflare Worker proxy — fixes Jio/Airtel blocking of *.supabase.co
+// VITE_SUPABASE_PROXY_URL is optional — if not set, connects directly
 const PROXY_URL = import.meta.env.VITE_SUPABASE_PROXY_URL
 
+// Always use the real Supabase URL for createClient
+// If proxy is set, intercept all fetch calls and rewrite URLs through it
 export const supabase = createClient(
-  PROXY_URL || SUPABASE_URL,
+  SUPABASE_URL,
   SUPABASE_ANON_KEY,
   PROXY_URL ? {
     global: {
       fetch: (url, options) => {
-        const proxied = url.toString().replace(SUPABASE_URL, PROXY_URL)
-        return fetch(proxied, options)
+        const urlStr = typeof url === 'string' ? url : url instanceof Request ? url.url : String(url)
+        if (urlStr.includes('supabase.co')) {
+          const proxied = urlStr.replace(/https:\/\/[^/]+\.supabase\.co/, PROXY_URL)
+          return fetch(proxied, options)
+        }
+        return fetch(url, options)
       }
     }
   } : {}
