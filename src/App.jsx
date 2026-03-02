@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage'
 import PendingPage from './pages/PendingPage'
 import Dashboard from './pages/Dashboard'
 import MyTask from './pages/MyTask'
+import ResetPassword from './pages/ResetPassword'
 
 import Expenses from './pages/Expenses'
 import CommonFund from './pages/CommonFund'
@@ -74,6 +75,7 @@ export default function App() {
       <Route path="/" element={<Guard><Layout siteSettings={siteSettings} isTaskAssigner={isTaskAssigner}/></Guard>}>
         <Route index          element={<PageGuard enabled={pages.dashboard}><Dashboard /></PageGuard>} />
         <Route path="mytask"  element={<PageGuard enabled={pages.mytask}><MyTask /></PageGuard>} />
+        <Route path="reset-password" element={<ResetPassword />} />
 
         <Route path="expenses"element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
         <Route path="fund"    element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
