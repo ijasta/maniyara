@@ -223,25 +223,7 @@ function AdminContent() {
 
       {/* ── WHATSAPP ── */}
       {tab==='whatsapp' && (
-        <div>
-          <SecHead title="Send WhatsApp Alerts"/>
-          {members.filter(m=>m.status==='approved').map(m=>{
-            const a=assigns.find(x=>x.member_id===m.id||x.members?.id===m.id), t=a?.tasks
-            const msg=`🏠 MANIYARA — Week ${week}\n\nHey ${m.name}! 👋\nYour task: ${t?.emoji||''} ${t?.name||'No task yet'}\n${t?.description||''}\n\nMark done on the app! ✅`
-            return (
-              <div key={m.id} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:13,marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
-                <Avatar emoji={m.avatar} color={m.color} size={38}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
-                  <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>{t?`${t.emoji} ${t.name}`:'No task assigned'}</div>
-                </div>
-                <a href={buildWALink(m.phone,msg)} target="_blank" rel="noreferrer" style={{textDecoration:'none',flexShrink:0}}>
-                  <Btn variant="wa" sm>📱 Send</Btn>
-                </a>
-              </div>
-            )
-          })}
-        </div>
+        <WhatsAppTab members={members} assigns={assigns} week={week} toast={toast}/>
       )}
 
       {/* ── SETTINGS ── */}
@@ -271,6 +253,117 @@ function AdminContent() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════
+// WHATSAPP TAB
+// ══════════════════════════════════════════════════════════
+function WhatsAppTab({ members, assigns, week, toast }) {
+  const approved = members.filter(m => m.status === 'approved')
+  const [msgTemplate, setMsgTemplate] = useState(
+    `🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`
+  )
+  const [sending, setSending] = useState(false)
+  const [sentCount, setSentCount] = useState(0)
+
+  const buildMsg = (member) => {
+    const a = assigns.find(x => x.member_id === member.id || x.members?.id === member.id)
+    const t = a?.tasks
+    return msgTemplate
+      .replace('{name}', member.name)
+      .replace('{task}', t ? `${t.emoji} ${t.name}` : 'No task assigned yet')
+  }
+
+  // Open all WhatsApp links one by one with delay
+  const sendToAll = async () => {
+    setSending(true)
+    setSentCount(0)
+    for (let i = 0; i < approved.length; i++) {
+      const m = approved[i]
+      const link = buildWALink(m.phone, buildMsg(m))
+      window.open(link, '_blank')
+      setSentCount(i + 1)
+      // Small delay so browser doesn't block popups
+      await new Promise(r => setTimeout(r, 800))
+    }
+    setSending(false)
+    toast(`✅ Opened WhatsApp for all ${approved.length} members!`)
+  }
+
+  return (
+    <div>
+      {/* ── BROADCAST BUTTON ── */}
+      <div style={{background:'linear-gradient(135deg,rgba(37,211,102,.1),rgba(37,211,102,.05))',
+        border:'2px solid rgba(37,211,102,.3)',borderRadius:14,padding:18,marginBottom:16,textAlign:'center'}}>
+        <div style={{fontSize:36,marginBottom:8}}>📢</div>
+        <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:800,color:'#25D366',letterSpacing:1,marginBottom:4}}>
+          BROADCAST TO ALL
+        </div>
+        <div style={{fontSize:12,color:'#8890b0',marginBottom:16,lineHeight:1.6}}>
+          Opens WhatsApp for all {approved.length} members at once with their task info
+        </div>
+        <button onClick={sendToAll} disabled={sending}
+          style={{width:'100%',padding:'15px',borderRadius:12,border:'none',cursor:sending?'not-allowed':'pointer',
+            background:sending?'#1a2030':'linear-gradient(135deg,#25D366,#128C7E)',
+            color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,
+            letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.3)',
+            opacity:sending?0.7:1,transition:'all .15s'}}>
+          {sending
+            ? `⏳ Opening... ${sentCount}/${approved.length}`
+            : `📱 Send to All ${approved.length} Members`}
+        </button>
+        {sending && (
+          <div style={{marginTop:10,fontSize:11,color:'#25D366'}}>
+            Allow popups if browser asks — each member opens in a new tab
+          </div>
+        )}
+      </div>
+
+      {/* ── MESSAGE TEMPLATE ── */}
+      <SecHead title="📝 Message Template"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
+        <div style={{fontSize:11,color:'#8890b0',marginBottom:10,lineHeight:1.6}}>
+          Use <span style={{color:'#7DF9AA',fontWeight:700}}>{'{name}'}</span> and <span style={{color:'#7DF9AA',fontWeight:700}}>{'{task}'}</span> — they get replaced with each member's actual info.
+        </div>
+        <textarea value={msgTemplate} onChange={e=>setMsgTemplate(e.target.value)}
+          rows={7} style={{...inp,width:'100%',resize:'vertical',fontSize:13,lineHeight:1.7}}/>
+        <button onClick={()=>setMsgTemplate(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)}
+          style={{marginTop:9,padding:'7px 14px',borderRadius:8,border:'1px solid rgba(125,249,170,.2)',
+            background:'transparent',color:'#7DF9AA',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Rajdhani,sans-serif'}}>
+          ↺ Reset to Default
+        </button>
+      </div>
+
+      {/* ── INDIVIDUAL SENDS ── */}
+      <SecHead title="📱 Send Individually"/>
+      <div style={{display:'flex',flexDirection:'column',gap:9}}>
+        {approved.map(m => {
+          const a = assigns.find(x => x.member_id === m.id || x.members?.id === m.id)
+          const t = a?.tasks
+          return (
+            <div key={m.id} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',
+              borderRadius:13,padding:13,display:'flex',alignItems:'center',gap:10}}>
+              <Avatar emoji={m.avatar} color={m.color} size={38}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
+                <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
+                  {t ? `${t.emoji} ${t.name}` : '⚠️ No task assigned'}
+                </div>
+              </div>
+              <a href={buildWALink(m.phone, buildMsg(m))} target="_blank" rel="noreferrer"
+                style={{textDecoration:'none',flexShrink:0}}>
+                <button style={{padding:'9px 14px',borderRadius:9,border:'1px solid rgba(37,211,102,.3)',
+                  background:'rgba(37,211,102,.1)',color:'#25D366',fontFamily:'Rajdhani,sans-serif',
+                  fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'}}>
+                  📱 Send
+                </button>
+              </a>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
