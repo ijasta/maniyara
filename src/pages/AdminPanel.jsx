@@ -277,10 +277,35 @@ function AdminContent() {
 // MEMBER CARD — attractive redesign
 // ══════════════════════════════════════════════════════════
 function MemberCard({ m, task, assign, toast, onDone }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded,  setExpanded]  = useState(false)
+  const [newPw,     setNewPw]     = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+  const [showPw,    setShowPw]    = useState(false)
 
   const statusColor = m.status==='approved' ? '#7DF9AA' : m.status==='rejected' ? '#FF6B6B' : '#FFD93D'
   const statusBg    = m.status==='approved' ? 'rgba(125,249,170,.1)' : m.status==='rejected' ? 'rgba(255,107,107,.1)' : 'rgba(255,217,61,.1)'
+
+  const changePassword = async () => {
+    if (!newPw)           { toast('Enter a new password','warn'); return }
+    if (newPw.length < 6) { toast('Min 6 characters','warn'); return }
+    if (!confirm(`Set new password for ${m.name}?\n\nMake sure to tell them their new password!`)) return
+    setPwLoading(true)
+    try {
+      const res = await fetch(
+        'https://fnnnetofvsggioysairt.supabase.co/functions/v1/admin-reset-password',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: m.auth_id || m.id, new_password: newPw })
+        }
+      )
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      toast(`✅ Password changed! Tell ${m.name} their new password: ${newPw}`)
+      setNewPw('')
+    } catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setPwLoading(false) }
+  }
 
   return (
     <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:16,marginBottom:12,overflow:'hidden',transition:'border-color .2s'}}>
@@ -393,6 +418,36 @@ function MemberCard({ m, task, assign, toast, onDone }) {
                 }}/>
               </div>
             ))}
+          </div>
+
+          {/* ── CHANGE PASSWORD ── */}
+          <div style={{background:'rgba(123,97,255,.07)',border:'1px solid rgba(123,97,255,.2)',borderRadius:10,padding:'12px 13px',marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#A78BFA',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>🔑 Change Password</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <div style={{position:'relative',flex:1}}>
+                <input
+                  type={showPw?'text':'password'}
+                  value={newPw}
+                  onChange={e=>setNewPw(e.target.value)}
+                  placeholder="New password (min 6 chars)"
+                  onKeyDown={e=>e.key==='Enter'&&changePassword()}
+                  style={{...inp,padding:'10px 38px 10px 12px',fontSize:13,width:'100%',letterSpacing:newPw&&!showPw?2:0}}/>
+                <button onClick={()=>setShowPw(x=>!x)}
+                  style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:14,color:'#4a5070',padding:2}}>
+                  {showPw?'🙈':'👁️'}
+                </button>
+              </div>
+              <button onClick={changePassword} disabled={pwLoading}
+                style={{padding:'10px 14px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:12,cursor:'pointer',flexShrink:0,border:'none',background:pwLoading?'#1a2030':'linear-gradient(135deg,#A78BFA,#7B61FF)',color:'#fff',opacity:pwLoading?0.6:1,whiteSpace:'nowrap',transition:'all .15s'}}>
+                {pwLoading?'⏳...':'✓ Set'}
+              </button>
+            </div>
+            {newPw.length>0 && newPw.length<6 && (
+              <div style={{fontSize:11,color:'#FF6B6B',marginTop:5}}>⚠️ Too short — min 6 characters</div>
+            )}
+            {newPw.length>=6 && (
+              <div style={{fontSize:11,color:'#7DF9AA',marginTop:5}}>✅ Good — press Set to apply</div>
+            )}
           </div>
 
           {/* Remove button */}
