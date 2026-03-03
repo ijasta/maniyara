@@ -679,27 +679,48 @@ function WhatsAppTab({ members, assigns, week, toast }) {
 function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
   const approved    = members.filter(m => m.status === 'approved')
   const activeTasks = tasks.filter(t => t.active)
-  const [taskMap, setTaskMap] = useState(() => {
+  const [taskMap,   setTaskMap]   = useState(() => {
     const m = {}; assigns.forEach(a=>{ m[a.member_id||a.members?.id] = a.task_id||a.tasks?.id }); return m
   })
-  const [saving,   setSaving]   = useState(false)
-  const [rotating, setRotating] = useState(false)
+  const [savingAll, setSavingAll] = useState(false)
+  const [savingOne, setSavingOne] = useState({}) // { memberId: true }
+  const [rotating,  setRotating]  = useState(false)
+
   useEffect(() => {
     const m = {}; assigns.forEach(a=>{ m[a.member_id||a.members?.id] = a.task_id||a.tasks?.id }); setTaskMap(m)
   }, [assigns])
+
   const allAssigned = approved.every(m => taskMap[m.id])
-  const rotationPreview = approved.map((m,i) => {
-    const nextM = approved[(i+1)%approved.length]
-    return { member:m, task:tasks.find(t=>t.id==taskMap[nextM?.id]) }
-  })
-  const saveAssignments = async () => {
-    const unassigned = approved.filter(m=>!taskMap[m.id])
-    if (unassigned.length>0) { toast(`Assign tasks to: ${unassigned.map(m=>m.name).join(', ')}`, 'warn'); return }
-    setSaving(true)
-    try { await adminAssignTasks(approved.map(m=>({member_id:m.id,task_id:taskMap[m.id]}))); toast(`Week ${week} tasks saved ✅`); onDone() }
-    catch(e) { toast('Failed: '+e.message,'error') }
-    finally { setSaving(false) }
+
+  // Save ONE member's task individually
+  const saveOne = async (member, taskId) => {
+    if (!taskId) { toast(`Pick a task for ${member.name} first`,'warn'); return }
+    setSavingOne(p=>({...p,[member.id]:true}))
+    try {
+      const cur = assigns.find(a=>a.member_id===member.id||a.members?.id===member.id)
+      if (cur) {
+        // Update existing assignment
+        await supabase.from('assignments').update({ task_id: taskId }).eq('id', cur.id)
+      } else {
+        // Create new assignment
+        await supabase.from('assignments').insert({ member_id: member.id, task_id: taskId, week_number: week, done: false })
+      }
+      toast(`✅ ${member.name} assigned!`)
+      onDone()
+    } catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setSavingOne(p=>({...p,[member.id]:false})) }
   }
+
+  // Save ALL at once
+  const saveAll = async () => {
+    const unassigned = approved.filter(m=>!taskMap[m.id])
+    if (unassigned.length>0) { toast(`Pick tasks for: ${unassigned.map(m=>m.name).join(', ')}`, 'warn'); return }
+    setSavingAll(true)
+    try { await adminAssignTasks(approved.map(m=>({member_id:m.id,task_id:taskMap[m.id]}))); toast(`Week ${week} — all saved ✅`); onDone() }
+    catch(e) { toast('Failed: '+e.message,'error') }
+    finally { setSavingAll(false) }
+  }
+
   const doRotate = async () => {
     if (!allAssigned) { toast('Assign tasks to all members first','warn'); return }
     if (!confirm(`Rotate tasks to Week ${week+1}?`)) return
@@ -708,8 +729,15 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
     catch(e) { toast('Rotate failed: '+e.message,'error') }
     finally { setRotating(false) }
   }
+
+  const rotationPreview = approved.map((m,i) => {
+    const nextM = approved[(i+1)%approved.length]
+    return { member:m, task:tasks.find(t=>t.id==taskMap[nextM?.id]) }
+  })
+
   return (
     <div>
+      {/* Week header */}
       <div style={{background:'linear-gradient(135deg,#0a1510,#0a0c1a)',border:'1px solid rgba(125,249,170,.2)',borderRadius:13,padding:'13px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
         <div style={{fontSize:32}}>📋</div>
         <div style={{flex:1}}>
@@ -721,10 +749,17 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
           <div style={{fontSize:13,fontWeight:700,color:allAssigned?'#7DF9AA':'#FFD93D',marginTop:2}}>{allAssigned?'✅ All Set':'⚠️ Incomplete'}</div>
         </div>
       </div>
-      <SecHead title="Assign Tasks to Members"/>
+
+      <SecHead title="Assign Tasks"/>
+      <div style={{fontSize:12,color:'#8890b0',marginBottom:10,lineHeight:1.6}}>
+        Pick a task per member and hit <span style={{color:'#7DF9AA',fontWeight:700}}>✓ Set</span> to save individually, or use <span style={{color:'#7DF9AA',fontWeight:700}}>💾 Save All</span> at the bottom.
+      </div>
+
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
         {approved.map((m,i)=>{
-          const cur=assigns.find(a=>a.member_id===m.id||a.members?.id===m.id)
+          const cur = assigns.find(a=>a.member_id===m.id||a.members?.id===m.id)
+          const isLoading = savingOne[m.id]
+          const hasChanged = taskMap[m.id] && String(taskMap[m.id]) !== String(cur?.task_id||cur?.tasks?.id||'')
           return (
             <div key={m.id} style={{marginBottom:12,paddingBottom:12,borderBottom:i<approved.length-1?'1px solid rgba(125,249,170,.06)':'none'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
@@ -733,21 +768,57 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
                   <div style={{fontWeight:700,fontSize:14}}>{m.name}</div>
                   {m.username&&<div style={{fontSize:11,color:'#4a5070'}}>@{m.username}</div>}
                 </div>
-                {cur&&<div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:cur.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',border:`1px solid ${cur.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,color:cur.done?'#7DF9AA':'#FFD93D',flexShrink:0}}>{cur.done?'✅ Done':'⏳ Pending'}</div>}
+                {cur && (
+                  <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                    background:cur.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',
+                    border:`1px solid ${cur.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,
+                    color:cur.done?'#7DF9AA':'#FFD93D'}}>
+                    {cur.done?'✅ Done':'⏳ Pending'}
+                  </div>
+                )}
               </div>
-              <div style={{display:'flex',gap:9,alignItems:'center'}}>
+              <div style={{display:'flex',gap:7,alignItems:'center'}}>
                 <select value={taskMap[m.id]||''} onChange={e=>setTaskMap(p=>({...p,[m.id]:e.target.value}))}
-                  style={{...inp,flex:1,padding:'10px 13px',borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
+                  style={{...inp,flex:1,padding:'10px 13px',
+                    borderColor:cur?.task_id||cur?.tasks?.id
+                      ? hasChanged?'rgba(255,217,61,.5)':'rgba(125,249,170,.3)'
+                      : taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
                   <option value="">— Pick a task —</option>
                   {activeTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
                 </select>
-                {cur&&<button onClick={async()=>{if(!confirm(`Remove ${m.name}'s task?`)) return;await deleteAssignment(cur.id);setTaskMap(p=>{const n={...p};delete n[m.id];return n});toast(`${m.name}'s task removed`,'warn');onDone()}} style={{padding:'9px 12px',borderRadius:8,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,flexShrink:0}}>🗑️</button>}
+                {/* Individual save button */}
+                <button
+                  onClick={()=>saveOne(m, taskMap[m.id])}
+                  disabled={isLoading||!taskMap[m.id]}
+                  style={{padding:'10px 14px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:12,cursor:'pointer',flexShrink:0,border:'none',
+                    background:isLoading?'#1a2030':taskMap[m.id]?'linear-gradient(135deg,#7DF9AA,#00D4AA)':'rgba(125,249,170,.08)',
+                    color:taskMap[m.id]?'#070810':'#4a5070',
+                    opacity:isLoading?0.6:1,transition:'all .15s',whiteSpace:'nowrap'}}>
+                  {isLoading?'⏳':'✓ Set'}
+                </button>
+                {/* Delete button */}
+                {cur&&(
+                  <button onClick={async()=>{if(!confirm(`Remove ${m.name}'s task?`)) return;await deleteAssignment(cur.id);setTaskMap(p=>{const n={...p};delete n[m.id];return n});toast(`${m.name}'s task removed`,'warn');onDone()}}
+                    style={{padding:'10px 12px',borderRadius:9,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,flexShrink:0}}>🗑️</button>
+                )}
               </div>
+              {/* Show current task name */}
+              {(cur?.tasks||cur?.task_id) && (
+                <div style={{fontSize:11,color:'#4a5070',marginTop:5,paddingLeft:2}}>
+                  Currently: <span style={{color:'#8890b0'}}>{cur.tasks?.emoji} {cur.tasks?.name || 'assigned'}</span>
+                  {hasChanged&&<span style={{color:'#FFD93D',fontWeight:700,marginLeft:6}}>← unsaved change</span>}
+                </div>
+              )}
             </div>
           )
         })}
-        <Btn full loading={saving} onClick={saveAssignments} style={{padding:13,fontSize:14,marginTop:4}}>💾 Save Assignments for Week {week}</Btn>
+        {/* Save all button */}
+        <div style={{borderTop:'1px solid rgba(125,249,170,.08)',paddingTop:12,marginTop:4}}>
+          <Btn full loading={savingAll} onClick={saveAll} style={{padding:13,fontSize:14}}>💾 Save ALL for Week {week}</Btn>
+        </div>
       </div>
+
+      {/* Rotate */}
       <div style={{background:'rgba(125,249,170,.05)',border:'2px solid rgba(125,249,170,.2)',borderRadius:13,padding:16,marginBottom:16}}>
         <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:8}}>🔄 ROTATE TO NEXT WEEK</div>
         <div style={{fontSize:13,color:'#8890b0',lineHeight:1.7,marginBottom:14}}>Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>below them</strong>. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.</div>
@@ -765,6 +836,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
         )}
         <Btn full loading={rotating} variant={allAssigned?'primary':'ghost'} style={{padding:14,fontSize:15,letterSpacing:1}} onClick={doRotate}>🔄 ROTATE → WEEK {week+1}</Btn>
       </div>
+
       <SecHead title="Delete Options"/>
       <div style={{display:'flex',flexDirection:'column',gap:9}}>
         <Btn variant="warn" full onClick={async()=>{if(!confirm(`Reset done status for Week ${week}?`)) return;try{await resetWeekDoneStatus(week);toast('Done status reset ✅');onDone()}catch(e){toast('Failed: '+e.message,'error')}}}>🔄 Reset Done Status — Keep Tasks</Btn>
@@ -774,6 +846,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
     </div>
   )
 }
+
 
 function AddTaskForm({ onAdd }) {
   const toast = useToast()
