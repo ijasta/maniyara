@@ -469,36 +469,16 @@ function MemberCard({ m, task, assign, toast, onDone }) {
 // ══════════════════════════════════════════════════════════
 function LogsTab({ logs, members, onClear }) {
   const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
 
-  const ACTION_TYPES = [
-    { key:'all',     label:'All',         color:'#7DF9AA' },
-    { key:'task',    label:'📋 Tasks',    color:'#4D96FF' },
-    { key:'member',  label:'👥 Members',  color:'#C77DFF' },
-    { key:'expense', label:'💸 Expenses', color:'#FF9A3C' },
-    { key:'fund',    label:'🏦 Fund',     color:'#FFD93D' },
-    { key:'auth',    label:'🔑 Auth',     color:'#FF6B6B' },
-  ]
+  const isFund   = a => { const x=a?.toLowerCase()||''; return x.includes('fund')||x.includes('transaction')||x.includes('treasurer') }
+  const isLogin  = a => { const x=a?.toLowerCase()||''; return x.includes('login')||x.includes('signup')||x.includes('sign in')||x.includes('register')||x.includes('approv')||x.includes('reject')||x.includes('joined') }
 
-  const getActionType = (action='') => {
-    const a = action.toLowerCase()
-    if (a.includes('task')||a.includes('assign')||a.includes('rotat')) return 'task'
-    if (a.includes('member')||a.includes('approv')||a.includes('reject')||a.includes('register')) return 'member'
-    if (a.includes('expense')||a.includes('split')||a.includes('paid')) return 'expense'
-    if (a.includes('fund')||a.includes('transaction')||a.includes('treasurer')) return 'fund'
-    if (a.includes('login')||a.includes('signup')||a.includes('auth')||a.includes('sign')) return 'auth'
-    return 'other'
-  }
-  const getActionIcon  = a => ({ task:'📋', member:'👥', expense:'💸', fund:'🏦', auth:'🔑', other:'⚡' }[getActionType(a)])
-  const getActionColor = a => ({ task:'#4D96FF', member:'#C77DFF', expense:'#FF9A3C', fund:'#FFD93D', auth:'#FF6B6B', other:'#7DF9AA' }[getActionType(a)])
+  const getIcon  = a => isFund(a) ? '🏦' : isLogin(a) ? '👤' : '📋'
+  const getColor = a => isFund(a) ? '#FFD93D' : isLogin(a) ? '#7DF9AA' : '#4a5070'
 
-  const filtered = logs.filter(l => {
-    const matchFilter = filter==='all' || getActionType(l.action)===filter
-    const matchSearch = !search || l.action?.toLowerCase().includes(search.toLowerCase())
-      || l.actor?.toLowerCase().includes(search.toLowerCase())
-      || l.details?.toLowerCase().includes(search.toLowerCase())
-    return matchFilter && matchSearch
-  })
+  // Only show fund + login/member logs
+  const relevant = logs.filter(l => isFund(l.action) || isLogin(l.action))
+  const filtered = filter==='all' ? relevant : filter==='fund' ? relevant.filter(l=>isFund(l.action)) : relevant.filter(l=>isLogin(l.action))
 
   const formatTime = ts => {
     const diff = Date.now() - new Date(ts)
@@ -509,57 +489,80 @@ function LogsTab({ logs, members, onClear }) {
     return new Date(ts).toLocaleDateString('en-IN',{day:'numeric',month:'short'})
   }
 
+  const fundLogs  = relevant.filter(l=>isFund(l.action))
+  const loginLogs = relevant.filter(l=>isLogin(l.action))
+
   return (
     <div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
+      {/* Stats */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:14}}>
         {[
-          {label:'Total Logs',value:logs.length,color:'#7DF9AA'},
-          {label:'Today',value:logs.filter(l=>new Date(l.created_at).toDateString()===new Date().toDateString()).length,color:'#4D96FF'},
-          {label:'This Week',value:logs.filter(l=>Date.now()-new Date(l.created_at)<604800000).length,color:'#FFD93D'},
+          {label:'🏦 Fund Logs',  value:fundLogs.length,  color:'#FFD93D'},
+          {label:'👤 Member Logs',value:loginLogs.length, color:'#7DF9AA'},
         ].map(s=>(
-          <div key={s.label} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:11,padding:'11px 12px',textAlign:'center'}}>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:18,fontWeight:900,color:s.color}}>{s.value}</div>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:2}}>{s.label}</div>
+          <div key={s.label} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:11,padding:'13px 12px',textAlign:'center'}}>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:22,fontWeight:900,color:s.color}}>{s.value}</div>
+            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:3}}>{s.label}</div>
           </div>
         ))}
       </div>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search logs..." style={{...inp,width:'100%',padding:'10px 13px',marginBottom:10}}/>
-      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
-        {ACTION_TYPES.map(t=>(
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:7,marginBottom:14}}>
+        {[
+          {key:'all',   label:'All',          color:'#7DF9AA', count:relevant.length},
+          {key:'fund',  label:'🏦 Fund',      color:'#FFD93D', count:fundLogs.length},
+          {key:'login', label:'👤 Members',   color:'#7DF9AA', count:loginLogs.length},
+        ].map(t=>(
           <button key={t.key} onClick={()=>setFilter(t.key)}
-            style={{padding:'5px 12px',borderRadius:99,fontSize:11,fontWeight:700,cursor:'pointer',
+            style={{flex:1,padding:'9px 6px',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all .15s',
               border:`1px solid ${filter===t.key?t.color:'rgba(255,255,255,.08)'}`,
-              background:filter===t.key?`${t.color}18`:'transparent',
-              color:filter===t.key?t.color:'#4a5070',transition:'all .15s'}}>
-            {t.label} {t.key!=='all'?`(${logs.filter(l=>getActionType(l.action)===t.key).length})`:''}
+              background:filter===t.key?`${t.color}15`:'#0d0e1a',
+              color:filter===t.key?t.color:'#4a5070'}}>
+            {t.label}<br/>
+            <span style={{fontFamily:'Orbitron,monospace',fontSize:14,fontWeight:900}}>{t.count}</span>
           </button>
         ))}
       </div>
+
+      {/* Log list */}
       {filtered.length===0 ? (
         <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:40,textAlign:'center',color:'#4a5070'}}>
-          <div style={{fontSize:32,marginBottom:8}}>📭</div>No logs found
+          <div style={{fontSize:36,marginBottom:10}}>📭</div>
+          <div style={{fontSize:14,fontWeight:600}}>No logs yet</div>
+          <div style={{fontSize:12,marginTop:4}}>Fund transactions and member joins will appear here</div>
         </div>
       ) : (
         <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,overflow:'hidden',marginBottom:14}}>
           {filtered.map((l,i)=>(
-            <div key={l.id} style={{padding:'12px 14px',borderBottom:i<filtered.length-1?'1px solid rgba(125,249,170,.05)':'none',display:'flex',gap:11,alignItems:'flex-start'}}>
-              <div style={{width:32,height:32,borderRadius:8,flexShrink:0,background:`${getActionColor(l.action)}18`,border:`1px solid ${getActionColor(l.action)}30`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,marginTop:1}}>
-                {getActionIcon(l.action)}
+            <div key={l.id} style={{padding:'13px 14px',borderBottom:i<filtered.length-1?'1px solid rgba(125,249,170,.05)':'none',display:'flex',gap:11,alignItems:'flex-start'}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:`${getColor(l.action)}15`,border:`1px solid ${getColor(l.action)}30`,
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,marginTop:1}}>
+                {getIcon(l.action)}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',lineHeight:1.4}}>{l.action}</div>
-                <div style={{display:'flex',gap:8,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
-                  {l.actor&&<span style={{fontSize:11,color:'#8890b0'}}>by <span style={{color:'#7DF9AA',fontWeight:700}}>{l.actor}</span></span>}
-                  {l.details&&<span style={{fontSize:11,color:'#4a5070'}}>· {l.details}</span>}
+                <div style={{display:'flex',gap:8,marginTop:4,flexWrap:'wrap',alignItems:'center'}}>
+                  {l.actor && (
+                    <span style={{fontSize:11,color:'#8890b0'}}>
+                      by <span style={{color:getColor(l.action),fontWeight:700}}>{l.actor}</span>
+                    </span>
+                  )}
+                  {l.details && <span style={{fontSize:11,color:'#4a5070'}}>· {l.details}</span>}
                 </div>
               </div>
-              <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0,marginTop:3}}>{formatTime(l.created_at)}</div>
+              <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0,marginTop:2,textAlign:'right'}}>
+                {formatTime(l.created_at)}
+              </div>
             </div>
           ))}
         </div>
       )}
-      {logs.length>0&&(
-        <button onClick={onClear} style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',letterSpacing:'.04em'}}>
+
+      {logs.length>0 && (
+        <button onClick={onClear}
+          style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',letterSpacing:'.04em'}}>
           🗑️ Clear All Logs
         </button>
       )}
