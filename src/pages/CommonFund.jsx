@@ -1,21 +1,31 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { getFundData, addFundTransaction, updateFundTransaction, deleteFundTransaction, updateFundSettings, getMembers } from '../lib/supabase'
-import { Avatar, SecHead, ToastProvider, useToast, inp } from '../components/UI'
+import { Avatar, ToastProvider, useToast, inp } from '../components/UI'
 
 const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 })
-const lbl = { display:'block', fontSize:10, fontWeight:700, color:'#4a5070', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:6 }
+const lbl = { display:'block', fontSize:10, fontWeight:700, color:'#6a7090', textTransform:'uppercase', letterSpacing:'.09em', marginBottom:6 }
 
-// ── ADD TRANSACTION SHEET ─────────────────────────────────
+// 2-hour edit window check
+const canEditTxn = (created_at) => Date.now() - new Date(created_at).getTime() < 2 * 60 * 60 * 1000
+const timeLeft   = (created_at) => {
+  const ms = 2*60*60*1000 - (Date.now() - new Date(created_at).getTime())
+  if (ms <= 0) return null
+  const m = Math.floor(ms / 60000)
+  return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m left` : `${m}m left`
+}
+
+// ── ADD SHEET ─────────────────────────────────────────────
 function AddSheet({ type, onClose, onDone }) {
-  const toast   = useToast()
+  const toast = useToast()
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setL]     = useState(false)
-
-  const presets = type === 'credit'
-    ? ['Monthly collection', 'Extra contribution', 'Returned change', 'Rent collection']
-    : ['Groceries', 'Electricity bill', 'Water bill', 'Cleaning supplies', 'Internet bill', 'Maintenance', 'Other house expense']
+  const isCredit = type === 'credit'
+  const ac = isCredit ? '#7DF9AA' : '#FF6B6B'
+  const presets = isCredit
+    ? ['Monthly collection','Extra contribution','Returned change','Rent collection']
+    : ['Groceries','Electricity bill','Water bill','Cleaning supplies','Internet bill','Maintenance','Other']
 
   const submit = async () => {
     if (!amount || isNaN(+amount) || +amount <= 0) { toast('Enter a valid amount','warn'); return }
@@ -23,71 +33,87 @@ function AddSheet({ type, onClose, onDone }) {
     setL(true)
     try {
       await addFundTransaction(type, +amount, reason.trim())
-      toast(type==='credit' ? '💰 Money added to fund ✅' : '💸 Expense recorded ✅')
+      toast(isCredit ? '💰 Money added ✅' : '💸 Expense recorded ✅')
       onDone(); onClose()
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setL(false) }
   }
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.88)',zIndex:600,display:'flex',alignItems:'flex-end',justifyContent:'center',backdropFilter:'blur(8px)'}}
-      onClick={e=>{ if(e.target===e.currentTarget) onClose() }}>
-      <div style={{background:'#0b0c1b',border:`1px solid ${type==='credit'?'rgba(125,249,170,.25)':'rgba(255,107,107,.25)'}`,borderRadius:'20px 20px 0 0',padding:0,width:'100%',maxWidth:520,maxHeight:'90dvh',overflowY:'auto',animation:'shUp .22s cubic-bezier(.34,1.2,.64,1)'}}>
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',zIndex:600,display:'flex',alignItems:'flex-end',justifyContent:'center',backdropFilter:'blur(10px)'}}>
+      <div style={{background:'#0b0d1e',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:520,maxHeight:'92dvh',overflowY:'auto',
+        border:`1px solid ${ac}33`,animation:'shUp .25s cubic-bezier(.34,1.2,.64,1)',
+        boxShadow:`0 -20px 60px ${ac}15`}}>
 
-        {/* Header */}
-        <div style={{position:'sticky',top:0,background:'#0b0c1b',padding:'14px 18px 12px',borderBottom:`1px solid ${type==='credit'?'rgba(125,249,170,.1)':'rgba(255,107,107,.1)'}`,zIndex:1}}>
-          <div style={{width:36,height:4,borderRadius:99,background:'rgba(255,255,255,.1)',margin:'0 auto 14px'}}/>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div>
-              <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:800,color:type==='credit'?'#7DF9AA':'#FF6B6B'}}>
-                {type==='credit' ? '💰 Add Money' : '💸 Record Spending'}
+        {/* Drag handle + header */}
+        <div style={{position:'sticky',top:0,background:'#0b0d1e',zIndex:1,padding:'12px 20px 14px',
+          borderBottom:`1px solid ${ac}18`}}>
+          <div style={{width:40,height:4,borderRadius:99,background:'rgba(255,255,255,.08)',margin:'0 auto 14px'}}/>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <div style={{width:46,height:46,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,
+              background:`linear-gradient(135deg,${ac}22,${ac}08)`,border:`1px solid ${ac}33`}}>
+              {isCredit?'💰':'💸'}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:'Orbitron,monospace',fontSize:15,fontWeight:800,color:ac}}>
+                {isCredit ? 'Add Money to Fund' : 'Record Spending'}
               </div>
-              <div style={{fontSize:11,color:'#8890b0',marginTop:2}}>
-                {type==='credit' ? 'Add collected money to the common fund' : 'Record money spent from the fund'}
+              <div style={{fontSize:11,color:'#6a7090',marginTop:2}}>
+                {isCredit ? 'Deposit collected amount into common fund' : 'Log an expense from the fund'}
               </div>
             </div>
-            <button onClick={onClose} style={{width:32,height:32,borderRadius:'50%',border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.05)',color:'#8890b0',fontSize:16,cursor:'pointer'}}>✕</button>
+            <button onClick={onClose} style={{width:32,height:32,borderRadius:10,border:'1px solid rgba(255,255,255,.08)',
+              background:'rgba(255,255,255,.04)',color:'#6a7090',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
           </div>
         </div>
 
-        <div style={{padding:'16px 18px 32px'}}>
-          {/* Amount */}
-          <div style={{background:type==='credit'?'rgba(125,249,170,.05)':'rgba(255,107,107,.05)',border:`1px solid ${type==='credit'?'rgba(125,249,170,.15)':'rgba(255,107,107,.15)'}`,borderRadius:14,padding:'16px',marginBottom:14,textAlign:'center'}}>
-            <div style={{fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>Amount (₹)</div>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
-              <span style={{fontFamily:'Orbitron,monospace',fontSize:26,fontWeight:900,color:type==='credit'?'#7DF9AA':'#FF6B6B'}}>₹</span>
-              <input type="number" inputMode="decimal" placeholder="0"
-                value={amount} onChange={e=>setAmount(e.target.value)}
-                style={{background:'transparent',border:'none',outline:'none',fontFamily:'Orbitron,monospace',fontSize:36,fontWeight:900,color:type==='credit'?'#7DF9AA':'#FF6B6B',width:160,textAlign:'center'}}/>
+        <div style={{padding:'18px 20px 36px'}}>
+          {/* Amount input */}
+          <div style={{background:`linear-gradient(135deg,${ac}0a,${ac}04)`,border:`1px solid ${ac}22`,
+            borderRadius:16,padding:'20px',marginBottom:16,textAlign:'center',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-20,right:-20,width:80,height:80,borderRadius:'50%',background:ac,opacity:.06,filter:'blur(20px)'}}/>
+            <div style={{fontSize:10,fontWeight:700,color:'#6a7090',textTransform:'uppercase',letterSpacing:'.12em',marginBottom:10}}>Amount</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:2}}>
+              <span style={{fontFamily:'Orbitron,monospace',fontSize:28,fontWeight:900,color:ac,opacity:.7}}>₹</span>
+              <input type="number" inputMode="decimal" placeholder="0.00"
+                value={amount} onChange={e=>setAmount(e.target.value)} autoFocus
+                style={{background:'transparent',border:'none',outline:'none',fontFamily:'Orbitron,monospace',
+                  fontSize:42,fontWeight:900,color:ac,width:200,textAlign:'center'}}/>
             </div>
+            {amount && !isNaN(+amount) && +amount > 0 && (
+              <div style={{fontSize:12,color:`${ac}99`,marginTop:6,fontWeight:600}}>{fmt(+amount)}</div>
+            )}
           </div>
 
           {/* Reason presets */}
-          <div style={{marginBottom:12}}>
-            <label style={lbl}>Quick Select Reason</label>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:9}}>
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>Quick Reason</label>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
               {presets.map(p=>(
                 <button key={p} onClick={()=>setReason(p)}
-                  style={{padding:'6px 12px',borderRadius:99,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Rajdhani,sans-serif',
-                    border:`1px solid ${reason===p?(type==='credit'?'#7DF9AA':'#FF6B6B'):'rgba(125,249,170,.1)'}`,
-                    background:reason===p?(type==='credit'?'rgba(125,249,170,.12)':'rgba(255,107,107,.1)'):'#131525',
-                    color:reason===p?(type==='credit'?'#7DF9AA':'#FF6B6B'):'#8890b0',transition:'all .12s'}}>
+                  style={{padding:'7px 13px',borderRadius:99,fontSize:11,fontWeight:700,cursor:'pointer',
+                    fontFamily:'Rajdhani,sans-serif',transition:'all .12s',
+                    border:`1px solid ${reason===p?ac:'rgba(255,255,255,.07)'}`,
+                    background:reason===p?`${ac}18`:'rgba(255,255,255,.03)',
+                    color:reason===p?ac:'#6a7090'}}>
                   {p}
                 </button>
               ))}
             </div>
-            <label style={lbl}>Or type custom reason</label>
-            <input style={{...inp,fontSize:'16px'}} placeholder="e.g. Bought new broom ₹150..."
+            <label style={lbl}>Custom reason</label>
+            <input style={{...inp,fontSize:'16px',background:'#131628',border:'1px solid rgba(255,255,255,.08)'}}
+              placeholder="e.g. Bought new broom..."
               value={reason} onChange={e=>setReason(e.target.value)}/>
           </div>
 
           <button onClick={submit} disabled={loading}
-            style={{width:'100%',padding:16,borderRadius:12,fontSize:15,fontWeight:800,cursor:'pointer',border:'none',
-              fontFamily:'Rajdhani,sans-serif',letterSpacing:'.08em',
-              background:type==='credit'?'linear-gradient(135deg,#7DF9AA,#00D4AA)':'linear-gradient(135deg,#FF6B6B,#FF9A3C)',
-              color:'#070810',opacity:loading?0.6:1,transition:'all .15s',
-              boxShadow:type==='credit'?'0 4px 20px rgba(125,249,170,.25)':'0 4px 20px rgba(255,107,107,.25)'}}>
-            {loading ? '⏳ Saving...' : type==='credit' ? '💰 Add to Fund' : '💸 Record Spending'}
+            style={{width:'100%',padding:16,borderRadius:14,fontSize:15,fontWeight:800,cursor:'pointer',border:'none',
+              fontFamily:'Rajdhani,sans-serif',letterSpacing:'.08em',transition:'all .15s',
+              background:isCredit?'linear-gradient(135deg,#7DF9AA,#00D4AA)':'linear-gradient(135deg,#FF6B6B,#FF9A3C)',
+              color:'#070810',opacity:loading?.6:1,
+              boxShadow:isCredit?'0 8px 24px rgba(125,249,170,.25)':'0 8px 24px rgba(255,107,107,.25)'}}>
+            {loading ? '⏳ Saving...' : isCredit ? '💰 Add to Fund' : '💸 Record Spending'}
           </button>
         </div>
       </div>
@@ -96,44 +122,60 @@ function AddSheet({ type, onClose, onDone }) {
   )
 }
 
-// ── EDIT TRANSACTION SHEET ────────────────────────────────
+// ── EDIT SHEET ────────────────────────────────────────────
 function EditSheet({ txn, onClose, onDone }) {
   const toast = useToast()
   const [amount, setAmount] = useState(String(txn.amount))
   const [reason, setReason] = useState(txn.reason)
   const [loading, setL]     = useState(false)
+  const ac = txn.type==='credit' ? '#7DF9AA' : '#FF6B6B'
 
   const save = async () => {
     if (!amount || +amount <= 0) { toast('Valid amount required','warn'); return }
     if (!reason.trim())          { toast('Reason required','warn'); return }
     setL(true)
     try {
-      await updateFundTransaction(txn.id, { amount: +amount, reason: reason.trim() })
+      await updateFundTransaction(txn.id, { amount:+amount, reason:reason.trim() })
       toast('Updated ✅'); onDone(); onClose()
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setL(false) }
   }
 
-  const c = txn.type==='credit' ? '#7DF9AA' : '#FF6B6B'
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.88)',zIndex:600,display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(8px)'}}
-      onClick={e=>{ if(e.target===e.currentTarget) onClose() }}>
-      <div style={{background:'#0b0c1b',border:`1px solid ${c}44`,borderRadius:18,padding:20,width:'100%',maxWidth:400}}>
-        <div style={{fontFamily:'Orbitron,monospace',fontSize:14,fontWeight:800,color:c,marginBottom:4}}>✏️ Edit Transaction</div>
-        <div style={{fontSize:11,color:'#8890b0',marginBottom:16}}>{txn.type==='credit'?'💰 Money In':'💸 Money Out'}</div>
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{position:'fixed',inset:0,background:'rgba(0,0,0,.88)',zIndex:600,display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(10px)'}}>
+      <div style={{background:'#0b0d1e',border:`1px solid ${ac}33`,borderRadius:20,padding:22,width:'100%',maxWidth:400,
+        boxShadow:`0 24px 60px rgba(0,0,0,.6),0 0 40px ${ac}10`}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
+          <div style={{width:40,height:40,borderRadius:12,background:`${ac}18`,border:`1px solid ${ac}33`,
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>✏️</div>
+          <div>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:800,color:ac}}>Edit Transaction</div>
+            <div style={{fontSize:11,color:'#6a7090',marginTop:1}}>{txn.type==='credit'?'💰 Money In':'💸 Money Out'}</div>
+          </div>
+        </div>
         <div style={{marginBottom:12}}>
           <label style={lbl}>Amount (₹)</label>
           <input type="number" value={amount} onChange={e=>setAmount(e.target.value)}
-            style={{...inp,fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:700,color:c}}/>
+            style={{...inp,fontFamily:'Orbitron,monospace',fontSize:22,fontWeight:700,color:ac,
+              background:'#131628',border:`1px solid ${ac}22`}}/>
         </div>
-        <div style={{marginBottom:16}}>
+        <div style={{marginBottom:18}}>
           <label style={lbl}>Reason</label>
-          <input value={reason} onChange={e=>setReason(e.target.value)} style={{...inp,fontSize:'16px'}}/>
+          <input value={reason} onChange={e=>setReason(e.target.value)}
+            style={{...inp,fontSize:'15px',background:'#131628',border:'1px solid rgba(255,255,255,.08)'}}/>
         </div>
         <div style={{display:'flex',gap:9}}>
-          <button onClick={onClose} style={{flex:1,padding:11,borderRadius:9,border:'1px solid rgba(125,249,170,.15)',background:'transparent',color:'#8890b0',fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer'}}>Cancel</button>
-          <button onClick={save} disabled={loading} style={{flex:2,padding:11,borderRadius:9,border:'none',background:`linear-gradient(135deg,${c},${txn.type==='credit'?'#00D4AA':'#FF9A3C'})`,color:'#070810',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:13,cursor:'pointer',opacity:loading?0.6:1}}>
-            {loading?'Saving...':'💾 Save'}
+          <button onClick={onClose}
+            style={{flex:1,padding:12,borderRadius:10,border:'1px solid rgba(255,255,255,.08)',background:'transparent',
+              color:'#6a7090',fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+            Cancel
+          </button>
+          <button onClick={save} disabled={loading}
+            style={{flex:2,padding:12,borderRadius:10,border:'none',fontFamily:'Rajdhani,sans-serif',fontWeight:800,
+              fontSize:13,cursor:'pointer',opacity:loading?.6:1,
+              background:`linear-gradient(135deg,${ac},${txn.type==='credit'?'#00D4AA':'#FF9A3C'})`,color:'#070810'}}>
+            {loading?'Saving...':'💾 Save Changes'}
           </button>
         </div>
       </div>
@@ -141,260 +183,402 @@ function EditSheet({ txn, onClose, onDone }) {
   )
 }
 
-// ── MAIN PAGE ─────────────────────────────────────────────
+// ── MAIN ─────────────────────────────────────────────────
 function CommonFundContent() {
   const { user, profile } = useAuth()
   const toast = useToast()
-  const [data,    setData]    = useState({ txns:[], settings:{}, balance:0 })
-  const [members, setMembers] = useState([])
-  const [loading, setL]       = useState(true)
-  const [sheet,   setSheet]   = useState(null)  // 'credit' | 'debit' | null
-  const [editTxn, setEditTxn] = useState(null)
-  const [filter,  setFilter]  = useState('all') // all | credit | debit
-  const [showSettings, setShowSettings] = useState(false)
-  const [stForm,  setStForm]  = useState({})
-  const [stSaving,setStSaving]= useState(false)
+  const [data,        setData]       = useState({ txns:[], settings:{}, balance:0 })
+  const [loading,     setL]          = useState(true)
+  const [sheet,       setSheet]      = useState(null)
+  const [editTxn,     setEditTxn]    = useState(null)
+  const [filter,      setFilter]     = useState('all')
+  const [showSettings,setShowSt]     = useState(false)
+  const [stForm,      setStForm]     = useState({})
+  const [stSaving,    setStSaving]   = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(()=>{ load() },[])
 
   async function load() {
     try {
-      const [d, mem] = await Promise.all([getFundData(), getMembers()])
+      const d = await getFundData()
       setData(d)
-      setMembers(mem.filter(m=>m.status==='approved'))
-      setStForm({ monthly_target: d.settings?.monthly_target||1000, low_balance_alert: d.settings?.low_balance_alert||200, treasurer_id: d.settings?.treasurer_id||'' })
-    } catch(e) { toast('Failed to load: '+e.message,'error') }
+      setStForm({ monthly_target:d.settings?.monthly_target||1000, low_balance_alert:d.settings?.low_balance_alert||200 })
+    } catch(e) { toast('Failed to load','error') }
     finally { setL(false) }
   }
 
-  const canEdit = profile?.is_admin || user?.id === data.settings?.treasurer_id
-
-  const filtered = data.txns.filter(t => filter==='all' || t.type===filter)
+  const canEdit   = profile?.is_admin || user?.id === data.settings?.treasurer_id
+  const isAdmin   = profile?.is_admin
+  const filtered  = data.txns.filter(t => filter==='all' || t.type===filter)
   const totalIn   = data.txns.filter(t=>t.type==='credit').reduce((s,t)=>s+Number(t.amount),0)
   const totalOut  = data.txns.filter(t=>t.type==='debit').reduce((s,t)=>s+Number(t.amount),0)
   const isLow     = data.balance <= (data.settings?.low_balance_alert||200) && data.balance >= 0
   const isNeg     = data.balance < 0
   const treasurer = data.settings?.treasurer
+  const pct       = data.settings?.monthly_target > 0
+    ? Math.min(100, (totalIn / data.settings.monthly_target) * 100) : 0
 
-  if (loading) return <div style={{color:'#8890b0',padding:60,textAlign:'center'}}>Loading...</div>
+  const balColor  = isNeg ? '#FF6B6B' : isLow ? '#FFD93D' : '#FFD93D'
+
+  if (loading) return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:80,gap:16}}>
+      <div style={{width:48,height:48,borderRadius:'50%',border:'3px solid rgba(255,217,61,.2)',borderTopColor:'#FFD93D',animation:'spin 1s linear infinite'}}/>
+      <div style={{fontSize:12,color:'#6a7090',fontWeight:700}}>Loading fund data...</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
 
   return (
-    <div className="page-anim">
+    <div className="page-anim" style={{paddingBottom:8}}>
 
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16}}>
+      {/* ── PAGE HEADER ── */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div>
-          <div style={{fontFamily:'Orbitron,monospace',fontWeight:900,fontSize:'clamp(20px,5.5vw,26px)',letterSpacing:1}}>
+          <div style={{fontFamily:'Orbitron,monospace',fontWeight:900,fontSize:'clamp(18px,5vw,24px)',letterSpacing:1,lineHeight:1.1}}>
             🏦 <span style={{background:'linear-gradient(135deg,#FFD93D,#FF9A3C)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>COMMON FUND</span>
           </div>
-          <div style={{fontSize:12,color:'#8890b0',marginTop:3}}>Shared house money pot</div>
+          <div style={{fontSize:11,color:'#6a7090',marginTop:4,letterSpacing:.3}}>Shared house treasury · Week overview</div>
         </div>
-        {profile?.is_admin && (
-          <button onClick={()=>setShowSettings(s=>!s)}
-            style={{padding:'8px 14px',borderRadius:99,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,border:'1px solid rgba(255,217,61,.25)',background:showSettings?'rgba(255,217,61,.12)':'rgba(255,217,61,.06)',color:'#FFD93D',cursor:'pointer'}}>
+        {isAdmin && (
+          <button onClick={()=>setShowSt(s=>!s)}
+            style={{padding:'8px 14px',borderRadius:10,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,
+              border:`1px solid ${showSettings?'rgba(255,217,61,.4)':'rgba(255,217,61,.15)'}`,
+              background:showSettings?'rgba(255,217,61,.12)':'rgba(255,217,61,.05)',
+              color:'#FFD93D',cursor:'pointer',display:'flex',alignItems:'center',gap:6,transition:'all .15s'}}>
             ⚙️ Settings
           </button>
         )}
       </div>
 
-      {/* Admin settings panel */}
-      {showSettings && profile?.is_admin && (
-        <div style={{background:'rgba(255,217,61,.05)',border:'1px solid rgba(255,217,61,.2)',borderRadius:13,padding:16,marginBottom:16}}>
-          <div style={{fontFamily:'Orbitron,monospace',fontSize:11,fontWeight:700,color:'#FFD93D',letterSpacing:2,marginBottom:14}}>⚙️ FUND SETTINGS</div>
+      {/* ── SETTINGS PANEL ── */}
+      {showSettings && isAdmin && (
+        <div style={{background:'linear-gradient(135deg,rgba(255,217,61,.06),rgba(255,154,60,.04))',
+          border:'1px solid rgba(255,217,61,.2)',borderRadius:16,padding:18,marginBottom:18,
+          boxShadow:'0 4px 24px rgba(255,217,61,.06)'}}>
+          <div style={{fontFamily:'Orbitron,monospace',fontSize:11,fontWeight:700,color:'#FFD93D',
+            letterSpacing:2,marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+            ⚙️ FUND SETTINGS
+          </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
             <div>
               <label style={lbl}>Monthly Target (₹)</label>
               <input type="number" value={stForm.monthly_target||''} onChange={e=>setStForm(f=>({...f,monthly_target:e.target.value}))}
-                style={{...inp,fontSize:'15px'}}/>
+                style={{...inp,fontSize:'15px',background:'#0d0e1a'}}/>
             </div>
             <div>
               <label style={lbl}>Low Balance Alert (₹)</label>
               <input type="number" value={stForm.low_balance_alert||''} onChange={e=>setStForm(f=>({...f,low_balance_alert:e.target.value}))}
-                style={{...inp,fontSize:'15px'}}/>
+                style={{...inp,fontSize:'15px',background:'#0d0e1a'}}/>
             </div>
           </div>
-          <div style={{fontSize:11,color:'#8890b0',marginBottom:12,padding:'8px 12px',background:'rgba(255,217,61,.05)',borderRadius:8,border:'1px solid rgba(255,217,61,.1)'}}>
-            💡 To assign a Treasurer, go to <strong style={{color:'#FFD93D'}}>Admin → Approvals → Assign Roles</strong>
+          <div style={{fontSize:11,color:'#8890b0',padding:'8px 12px',background:'rgba(255,217,61,.04)',
+            borderRadius:8,border:'1px solid rgba(255,217,61,.1)',marginBottom:12}}>
+            💡 To assign a Treasurer → <strong style={{color:'#FFD93D'}}>Admin → Members → Assign Roles</strong>
           </div>
           <button onClick={async()=>{
             setStSaving(true)
-            try {
-              await updateFundSettings({ monthly_target:+stForm.monthly_target, low_balance_alert:+stForm.low_balance_alert })
-              toast('Fund settings saved ✅'); load(); setShowSettings(false)
-            } catch(e) { toast('Failed: '+e.message,'error') }
+            try { await updateFundSettings({monthly_target:+stForm.monthly_target,low_balance_alert:+stForm.low_balance_alert}); toast('Settings saved ✅'); load(); setShowSt(false) }
+            catch(e) { toast('Failed: '+e.message,'error') }
             finally { setStSaving(false) }
-          }} disabled={stSaving} style={{width:'100%',padding:11,borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:13,cursor:'pointer',border:'none',background:'linear-gradient(135deg,#FFD93D,#FF9A3C)',color:'#070810',opacity:stSaving?0.6:1}}>
+          }} disabled={stSaving} style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',
+            fontWeight:800,fontSize:13,cursor:'pointer',border:'none',
+            background:'linear-gradient(135deg,#FFD93D,#FF9A3C)',color:'#070810',opacity:stSaving?.6:1}}>
             {stSaving?'Saving...':'💾 Save Settings'}
           </button>
         </div>
       )}
 
-      {/* Treasurer badge */}
-      {treasurer && (
-        <div style={{background:'rgba(255,217,61,.06)',border:'1px solid rgba(255,217,61,.15)',borderRadius:11,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:10}}>
-          <Avatar emoji={treasurer.avatar} color={treasurer.color} size={30}/>
-          <div>
-            <div style={{fontSize:11,color:'#FFD93D',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Treasurer</div>
-            <div style={{fontSize:13,fontWeight:700,marginTop:1}}>{treasurer.name}</div>
-          </div>
-          <div style={{marginLeft:'auto',fontSize:11,color:'#8890b0'}}>Can manage fund</div>
-        </div>
-      )}
-
-      {/* Low balance / negative warning */}
+      {/* ── ALERTS ── */}
       {isNeg && (
-        <div style={{background:'rgba(255,107,107,.1)',border:'1px solid rgba(255,107,107,.3)',borderRadius:13,padding:'13px 16px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}>
-          <span style={{fontSize:28}}>🚨</span>
+        <div style={{background:'linear-gradient(135deg,rgba(255,107,107,.12),rgba(255,107,107,.06))',
+          border:'1px solid rgba(255,107,107,.35)',borderRadius:14,padding:'14px 16px',marginBottom:14,
+          display:'flex',gap:12,alignItems:'center',boxShadow:'0 4px 20px rgba(255,107,107,.1)'}}>
+          <div style={{fontSize:30,lineHeight:1}}>🚨</div>
           <div>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:700,color:'#FF6B6B'}}>FUND IN DEFICIT!</div>
-            <div style={{fontSize:12,color:'#FF6B6B',marginTop:2,opacity:.8}}>Spending exceeds collected amount by {fmt(Math.abs(data.balance))}</div>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,color:'#FF6B6B',letterSpacing:.5}}>FUND IN DEFICIT</div>
+            <div style={{fontSize:12,color:'#FF6B6B',marginTop:3,opacity:.85}}>Overspent by {fmt(Math.abs(data.balance))} — collect funds urgently</div>
           </div>
         </div>
       )}
       {isLow && !isNeg && (
-        <div style={{background:'rgba(255,217,61,.08)',border:'1px solid rgba(255,217,61,.25)',borderRadius:13,padding:'13px 16px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}>
-          <span style={{fontSize:28}}>⚠️</span>
+        <div style={{background:'linear-gradient(135deg,rgba(255,217,61,.1),rgba(255,217,61,.04))',
+          border:'1px solid rgba(255,217,61,.3)',borderRadius:14,padding:'14px 16px',marginBottom:14,
+          display:'flex',gap:12,alignItems:'center',boxShadow:'0 4px 20px rgba(255,217,61,.08)'}}>
+          <div style={{fontSize:30,lineHeight:1}}>⚠️</div>
           <div>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:700,color:'#FFD93D'}}>LOW BALANCE!</div>
-            <div style={{fontSize:12,color:'#FFD93D',marginTop:2,opacity:.8}}>Only {fmt(data.balance)} left. Consider collecting more.</div>
+            <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,color:'#FFD93D',letterSpacing:.5}}>LOW BALANCE</div>
+            <div style={{fontSize:12,color:'#FFD93D',marginTop:3,opacity:.85}}>Only {fmt(data.balance)} remaining — consider collecting more</div>
           </div>
         </div>
       )}
 
-      {/* Main balance card */}
-      <div style={{background:'linear-gradient(135deg,#0e1208,#0a0c1a)',border:`2px solid ${isNeg?'#FF6B6B':isLow?'#FFD93D':'rgba(255,217,61,.35)'}`,borderRadius:16,padding:'22px 20px',marginBottom:14,position:'relative',overflow:'hidden'}}>
-        <div style={{position:'absolute',top:-30,right:-30,width:120,height:120,borderRadius:'50%',background:isNeg?'#FF6B6B':isLow?'#FFD93D':'#FFD93D',opacity:.06,filter:'blur(24px)'}}/>
-        <div style={{fontSize:11,color:'#8890b0',fontWeight:700,textTransform:'uppercase',letterSpacing:'.12em',marginBottom:6}}>Current Balance</div>
-        <div style={{fontFamily:'Orbitron,monospace',fontSize:'clamp(32px,9vw,48px)',fontWeight:900,color:isNeg?'#FF6B6B':isLow?'#FFD93D':'#FFD93D',lineHeight:1,marginBottom:10}}>
+      {/* ── MAIN BALANCE CARD ── */}
+      <div style={{background:'linear-gradient(145deg,#0e1020,#0a0c1a)',
+        border:`1px solid ${balColor}44`,borderRadius:20,padding:'24px 20px',marginBottom:14,
+        position:'relative',overflow:'hidden',
+        boxShadow:`0 8px 40px rgba(0,0,0,.5), 0 0 0 1px ${balColor}22, inset 0 1px 0 rgba(255,255,255,.04)`}}>
+
+        {/* Background glow */}
+        <div style={{position:'absolute',top:-40,right:-40,width:160,height:160,borderRadius:'50%',
+          background:balColor,opacity:.07,filter:'blur(40px)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:-60,left:-20,width:120,height:120,borderRadius:'50%',
+          background:'#4D96FF',opacity:.04,filter:'blur(30px)',pointerEvents:'none'}}/>
+
+        {/* Top shimmer */}
+        <div style={{position:'absolute',top:0,left:'10%',right:'10%',height:1,
+          background:`linear-gradient(90deg,transparent,${balColor}66,transparent)`}}/>
+
+        <div style={{fontSize:10,fontWeight:700,color:'#6a7090',textTransform:'uppercase',letterSpacing:'.14em',marginBottom:8}}>
+          Current Balance
+        </div>
+        <div style={{fontFamily:'Orbitron,monospace',fontSize:'clamp(34px,10vw,52px)',fontWeight:900,
+          color:balColor,lineHeight:1,marginBottom:16,
+          textShadow:`0 0 30px ${balColor}44`}}>
           {fmt(data.balance)}
         </div>
-        <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
-          <div>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Total In</div>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:700,color:'#7DF9AA',marginTop:2}}>+{fmt(totalIn)}</div>
-          </div>
-          <div style={{width:1,background:'rgba(255,255,255,.06)'}}/>
-          <div>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Total Out</div>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:700,color:'#FF6B6B',marginTop:2}}>-{fmt(totalOut)}</div>
-          </div>
-          <div style={{width:1,background:'rgba(255,255,255,.06)'}}/>
-          <div>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Transactions</div>
-            <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:700,color:'#E8F0FF',marginTop:2}}>{data.txns.length}</div>
-          </div>
+
+        {/* Stats row */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr 1px 1fr',gap:0,
+          background:'rgba(255,255,255,.03)',borderRadius:12,overflow:'hidden',
+          border:'1px solid rgba(255,255,255,.05)'}}>
+          {[
+            {label:'Total In',    value:'+'+fmt(totalIn),  color:'#7DF9AA'},
+            null,
+            {label:'Total Out',   value:'-'+fmt(totalOut), color:'#FF6B6B'},
+            null,
+            {label:'Entries',     value:data.txns.length,  color:'#E8F0FF'},
+          ].map((s,i) => s ? (
+            <div key={i} style={{padding:'12px 8px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>{s.label}</div>
+              <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:700,color:s.color}}>{s.value}</div>
+            </div>
+          ) : (
+            <div key={i} style={{background:'rgba(255,255,255,.04)'}}/>
+          ))}
         </div>
       </div>
 
-      {/* Monthly target progress */}
+      {/* ── MONTHLY TARGET ── */}
       {data.settings?.monthly_target > 0 && (
-        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:13,padding:'12px 16px',marginBottom:14}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:'#8890b0'}}>Monthly Target</div>
-            <div style={{fontSize:13,fontWeight:700,color:'#FFD93D'}}>{fmt(Math.min(totalIn,data.settings.monthly_target))} / {fmt(data.settings.monthly_target)}</div>
+        <div style={{background:'#0d0f1e',border:'1px solid rgba(255,255,255,.06)',borderRadius:16,
+          padding:'14px 16px',marginBottom:14,position:'relative',overflow:'hidden'}}>
+          <div style={{position:'absolute',top:0,left:0,right:0,height:2,borderRadius:99,
+            background:`linear-gradient(90deg,transparent,#FFD93D,transparent)`,opacity:.4}}/>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:'#8890b0',textTransform:'uppercase',letterSpacing:'.08em'}}>Monthly Target</div>
+              <div style={{fontSize:12,color:'#6a7090',marginTop:2}}>{Math.round(pct)}% collected</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:700,color:'#FFD93D'}}>
+                {fmt(Math.min(totalIn,data.settings.monthly_target))}
+              </div>
+              <div style={{fontSize:10,color:'#4a5070',marginTop:1}}>of {fmt(data.settings.monthly_target)}</div>
+            </div>
           </div>
-          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:99,overflow:'hidden'}}>
-            <div style={{height:'100%',borderRadius:99,background:'linear-gradient(90deg,#FFD93D,#FF9A3C)',width:`${Math.min(100,(totalIn/data.settings.monthly_target)*100)}%`,transition:'width .4s'}}/>
+          <div style={{height:10,background:'rgba(255,255,255,.05)',borderRadius:99,overflow:'hidden',position:'relative'}}>
+            <div style={{height:'100%',borderRadius:99,transition:'width .6s cubic-bezier(.4,0,.2,1)',
+              width:`${pct}%`,
+              background:pct>=100
+                ? 'linear-gradient(90deg,#7DF9AA,#00D4AA)'
+                : pct>=70
+                  ? 'linear-gradient(90deg,#FFD93D,#FF9A3C)'
+                  : 'linear-gradient(90deg,#FF6B6B,#FF9A3C)',
+              boxShadow:pct>=100?'0 0 10px rgba(125,249,170,.4)':pct>=70?'0 0 10px rgba(255,217,61,.4)':'none'
+            }}/>
           </div>
-          <div style={{fontSize:11,color:'#4a5070',marginTop:5}}>{Math.round(Math.min(100,(totalIn/data.settings.monthly_target)*100))}% of target collected</div>
+          {pct >= 100 && (
+            <div style={{fontSize:11,color:'#7DF9AA',fontWeight:700,marginTop:6,display:'flex',alignItems:'center',gap:5}}>
+              🎉 Target reached!
+            </div>
+          )}
         </div>
       )}
 
-      {/* Add money / record spending buttons */}
+      {/* ── TREASURER BADGE ── */}
+      {treasurer && (
+        <div style={{background:'rgba(255,217,61,.05)',border:'1px solid rgba(255,217,61,.12)',
+          borderRadius:14,padding:'11px 14px',marginBottom:14,
+          display:'flex',alignItems:'center',gap:12}}>
+          <div style={{position:'relative'}}>
+            <Avatar emoji={treasurer.avatar} color={treasurer.color} size={36}/>
+            <div style={{position:'absolute',bottom:-2,right:-2,fontSize:12,lineHeight:1}}>👑</div>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:10,color:'#FFD93D',fontWeight:700,textTransform:'uppercase',letterSpacing:'.1em'}}>Treasurer</div>
+            <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',marginTop:2}}>{treasurer.name}</div>
+          </div>
+          <div style={{fontSize:10,color:'#6a7090',textAlign:'right',lineHeight:1.5}}>
+            Manages<br/>this fund
+          </div>
+        </div>
+      )}
+
+      {/* ── ACTION BUTTONS ── */}
       {canEdit && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
           <button onClick={()=>setSheet('credit')}
-            style={{padding:'14px',borderRadius:12,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:14,cursor:'pointer',
-              border:'2px solid rgba(125,249,170,.3)',background:'rgba(125,249,170,.08)',color:'#7DF9AA',letterSpacing:'.05em',
-              transition:'all .15s',boxShadow:'0 0 0 rgba(125,249,170,0)'}}>
-            💰 Add Money
+            style={{padding:'16px 12px',borderRadius:14,fontFamily:'Rajdhani,sans-serif',fontWeight:800,
+              fontSize:14,cursor:'pointer',border:'1px solid rgba(125,249,170,.25)',
+              background:'linear-gradient(135deg,rgba(125,249,170,.1),rgba(125,249,170,.04))',
+              color:'#7DF9AA',letterSpacing:'.04em',transition:'all .15s',
+              boxShadow:'0 4px 16px rgba(125,249,170,.08)',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            <span style={{fontSize:20}}>💰</span>
+            <span>Add Money</span>
           </button>
           <button onClick={()=>setSheet('debit')}
-            style={{padding:'14px',borderRadius:12,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:14,cursor:'pointer',
-              border:'2px solid rgba(255,107,107,.3)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',letterSpacing:'.05em',
-              transition:'all .15s'}}>
-            💸 Record Spending
+            style={{padding:'16px 12px',borderRadius:14,fontFamily:'Rajdhani,sans-serif',fontWeight:800,
+              fontSize:14,cursor:'pointer',border:'1px solid rgba(255,107,107,.25)',
+              background:'linear-gradient(135deg,rgba(255,107,107,.1),rgba(255,107,107,.04))',
+              color:'#FF6B6B',letterSpacing:'.04em',transition:'all .15s',
+              boxShadow:'0 4px 16px rgba(255,107,107,.08)',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            <span style={{fontSize:20}}>💸</span>
+            <span>Record Spend</span>
           </button>
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div style={{display:'flex',gap:4,background:'#0d0e1a',border:'1px solid rgba(125,249,170,.07)',borderRadius:13,padding:5,marginBottom:14}}>
-        {[['all','All'],['credit','💰 Money In'],['debit','💸 Money Out']].map(([id,lb])=>(
-          <button key={id} onClick={()=>setFilter(id)}
-            style={{flex:1,padding:'9px 6px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
-              fontFamily:'Rajdhani,sans-serif',background:filter===id?'#FFD93D':'transparent',
-              color:filter===id?'#070810':'#8890b0',transition:'all .15s',whiteSpace:'nowrap'}}>
-            {lb}
+      {/* ── FILTER TABS ── */}
+      <div style={{display:'flex',gap:0,background:'#0d0f1e',border:'1px solid rgba(255,255,255,.06)',
+        borderRadius:14,padding:4,marginBottom:16,overflow:'hidden'}}>
+        {[
+          {id:'all',    label:'All',       count:data.txns.length},
+          {id:'credit', label:'💰 In',     count:data.txns.filter(t=>t.type==='credit').length},
+          {id:'debit',  label:'💸 Out',    count:data.txns.filter(t=>t.type==='debit').length},
+        ].map(f=>(
+          <button key={f.id} onClick={()=>setFilter(f.id)}
+            style={{flex:1,padding:'9px 6px',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
+              fontFamily:'Rajdhani,sans-serif',transition:'all .18s',
+              background:filter===f.id?'#FFD93D':'transparent',
+              color:filter===f.id?'#070810':'#6a7090',
+              boxShadow:filter===f.id?'0 2px 10px rgba(255,217,61,.25)':'none'}}>
+            {f.label}
+            <span style={{marginLeft:5,fontSize:10,fontWeight:900,
+              opacity:filter===f.id?1:.6,
+              background:filter===f.id?'rgba(0,0,0,.15)':'rgba(255,255,255,.06)',
+              padding:'1px 6px',borderRadius:99}}>
+              {f.count}
+            </span>
           </button>
         ))}
       </div>
 
-      {/* Transaction list */}
-      <SecHead title="Transaction History" badge={`${filtered.length} entries`}/>
+      {/* ── TRANSACTION LIST ── */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.1em'}}>
+          Transaction History
+        </div>
+        <div style={{fontSize:10,color:'#4a5070',fontWeight:600}}>{filtered.length} entries</div>
+      </div>
+
       {filtered.length === 0 ? (
-        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.07)',borderRadius:13,padding:'50px 20px',textAlign:'center'}}>
-          <div style={{fontSize:44,marginBottom:10}}>🏦</div>
-          <div style={{color:'#4a5070',fontSize:14}}>No transactions yet.<br/>
-            {canEdit && <span>Tap <strong style={{color:'#7DF9AA'}}>Add Money</strong> or <strong style={{color:'#FF6B6B'}}>Record Spending</strong> to start.</span>}
-          </div>
+        <div style={{background:'#0d0f1e',border:'1px solid rgba(255,255,255,.05)',borderRadius:16,
+          padding:'52px 20px',textAlign:'center'}}>
+          <div style={{fontSize:48,marginBottom:12,opacity:.6}}>🏦</div>
+          <div style={{color:'#4a5070',fontSize:14,fontWeight:600,marginBottom:6}}>No transactions yet</div>
+          {canEdit && <div style={{fontSize:12,color:'#4a5070'}}>Tap <strong style={{color:'#7DF9AA'}}>Add Money</strong> or <strong style={{color:'#FF6B6B'}}>Record Spend</strong> to get started</div>}
         </div>
       ) : filtered.map((t, i) => {
-        const isCredit = t.type === 'credit'
-        const addedBy  = t.added_by_member
+        const isCredit  = t.type === 'credit'
+        const ac        = isCredit ? '#7DF9AA' : '#FF6B6B'
+        const addedBy   = t.added_by_member
+        const editable  = canEditTxn(t.created_at)
+        const tLeft     = timeLeft(t.created_at)
+        const showEdit  = canEdit && editable        // edit: admin/treasurer + within 2h
+        const showDel   = isAdmin                    // delete: admin only, no time limit
+
         return (
-          <div key={t.id} style={{background:'#0d0e1a',border:`1px solid ${isCredit?'rgba(125,249,170,.12)':'rgba(255,107,107,.12)'}`,borderRadius:13,padding:'13px 14px',marginBottom:9,display:'flex',alignItems:'center',gap:12}}>
+          <div key={t.id} style={{background:'#0d0f1e',
+            border:`1px solid ${ac}18`,borderRadius:16,padding:'14px 15px',marginBottom:8,
+            position:'relative',overflow:'hidden',transition:'all .15s',
+            boxShadow:'0 2px 12px rgba(0,0,0,.2)'}}>
 
-            {/* Icon */}
-            <div style={{width:44,height:44,borderRadius:12,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,
-              background:isCredit?'rgba(125,249,170,.08)':'rgba(255,107,107,.08)',
-              border:`1px solid ${isCredit?'rgba(125,249,170,.15)':'rgba(255,107,107,.15)'}`}}>
-              {isCredit?'💰':'💸'}
-            </div>
+            {/* Left accent bar */}
+            <div style={{position:'absolute',left:0,top:'20%',bottom:'20%',width:3,borderRadius:'0 3px 3px 0',
+              background:`linear-gradient(180deg,${ac},${ac}44)`}}/>
 
-            {/* Info */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:700,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.reason}</div>
-              <div style={{fontSize:11,color:'#8890b0',marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                {addedBy && (
-                  <span style={{display:'flex',alignItems:'center',gap:4}}>
-                    <span>{addedBy.avatar}</span>
-                    <span>{addedBy.name}</span>
+            <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:6}}>
+              {/* Icon */}
+              <div style={{width:44,height:44,borderRadius:13,flexShrink:0,display:'flex',alignItems:'center',
+                justifyContent:'center',fontSize:22,
+                background:`linear-gradient(135deg,${ac}18,${ac}08)`,
+                border:`1px solid ${ac}22`}}>
+                {isCredit?'💰':'💸'}
+              </div>
+
+              {/* Info */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:14,color:'#E8F0FF',overflow:'hidden',
+                  textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:4}}>
+                  {t.reason}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  {addedBy && (
+                    <span style={{display:'flex',alignItems:'center',gap:4,
+                      background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',
+                      borderRadius:99,padding:'2px 8px 2px 4px',fontSize:10,fontWeight:600,color:'#8890b0'}}>
+                      <span>{addedBy.avatar}</span>
+                      <span>{addedBy.name}</span>
+                    </span>
+                  )}
+                  <span style={{fontSize:10,color:'#4a5070'}}>
+                    {new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
                   </span>
+                  <span style={{fontSize:10,color:'#4a5070'}}>
+                    {new Date(t.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+                  </span>
+                </div>
+                {/* Edit time window indicator */}
+                {canEdit && tLeft && (
+                  <div style={{marginTop:4,fontSize:9,color:isCredit?'#7DF9AA99':'#FF6B6B99',
+                    fontWeight:700,display:'flex',alignItems:'center',gap:3}}>
+                    ⏱ Editable for {tLeft}
+                  </div>
                 )}
-                <span>·</span>
-                <span>{new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
               </div>
-            </div>
 
-            {/* Amount */}
-            <div style={{textAlign:'right',flexShrink:0}}>
-              <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:isCredit?'#7DF9AA':'#FF6B6B'}}>
-                {isCredit?'+':'-'}{fmt(t.amount)}
+              {/* Amount */}
+              <div style={{textAlign:'right',flexShrink:0,marginRight:showEdit||showDel?8:0}}>
+                <div style={{fontFamily:'Orbitron,monospace',fontSize:15,fontWeight:900,color:ac,
+                  textShadow:`0 0 16px ${ac}44`}}>
+                  {isCredit?'+':'-'}{fmt(t.amount)}
+                </div>
+                <div style={{fontSize:9,fontWeight:700,color:`${ac}88`,marginTop:2,
+                  textTransform:'uppercase',letterSpacing:'.06em'}}>
+                  {isCredit?'CREDIT':'DEBIT'}
+                </div>
               </div>
-              <div style={{fontSize:10,fontWeight:700,color:isCredit?'#7DF9AA':'#FF6B6B',marginTop:2,opacity:.7}}>
-                {isCredit?'CREDIT':'DEBIT'}
-              </div>
-            </div>
 
-            {/* Edit / Delete — admin or treasurer only */}
-            {canEdit && (
-              <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
-                <button onClick={()=>setEditTxn(t)}
-                  style={{width:30,height:30,borderRadius:7,border:'1px solid rgba(77,150,255,.2)',background:'rgba(77,150,255,.07)',color:'#4D96FF',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center'}}>✏️</button>
-                <button onClick={async()=>{
-                  if(!confirm(`Delete "${t.reason}"?`)) return
-                  try { await deleteFundTransaction(t.id); toast('Deleted','warn'); load() }
-                  catch(e) { toast('Failed: '+e.message,'error') }
-                }} style={{width:30,height:30,borderRadius:7,border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center'}}>🗑️</button>
-              </div>
-            )}
+              {/* Action buttons */}
+              {(showEdit || showDel) && (
+                <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
+                  {showEdit && (
+                    <button onClick={()=>setEditTxn(t)}
+                      style={{width:32,height:32,borderRadius:9,border:'1px solid rgba(77,150,255,.2)',
+                        background:'rgba(77,150,255,.08)',color:'#4D96FF',cursor:'pointer',fontSize:13,
+                        display:'flex',alignItems:'center',justifyContent:'center',transition:'all .12s'}}>
+                      ✏️
+                    </button>
+                  )}
+                  {showDel && (
+                    <button onClick={async()=>{
+                      if(!confirm(`Delete "${t.reason}"?`)) return
+                      try { await deleteFundTransaction(t.id); toast('Deleted 🗑️','warn'); load() }
+                      catch(e) { toast('Failed: '+e.message,'error') }
+                    }} style={{width:32,height:32,borderRadius:9,border:'1px solid rgba(255,107,107,.2)',
+                      background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:13,
+                      display:'flex',alignItems:'center',justifyContent:'center',transition:'all .12s'}}>
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )
       })}
 
-      {/* Sheets */}
-      {sheet && <AddSheet type={sheet} onClose={()=>setSheet(null)} onDone={load}/>}
+      {sheet   && <AddSheet  type={sheet}  onClose={()=>setSheet(null)}   onDone={load}/>}
       {editTxn && <EditSheet txn={editTxn} onClose={()=>setEditTxn(null)} onDone={load}/>}
     </div>
   )
