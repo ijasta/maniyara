@@ -29,6 +29,7 @@ function MyTaskContent() {
   const [loading,    setLd]    = useState(true)
   const [submitting, setSub]   = useState(false)
   const [proof,      setProof] = useState(null)
+  const [photoModal, setPhotoModal] = useState(null) // URL to show in modal
   const [viewLoading,setVL]    = useState(false)
   const fileRef = useRef()
 
@@ -113,32 +114,23 @@ function MyTaskContent() {
     }
   }
 
-  // Opens proof photo in new tab using a fresh signed URL (avoids expired token issue)
+  // Show proof photo in inline modal — works on all mobile browsers
   const viewProof = async () => {
     if (!assignment?.proof_url) return
     setVL(true)
     try {
-      // Extract the storage path from the full URL
-      // Supabase URLs look like: .../storage/v1/object/public/BUCKET/path/to/file.jpg
       const url = assignment.proof_url
       const match = url.match(/\/object\/(?:public|sign)\/([^?]+)/)
-      if (!match) throw new Error('Could not parse photo URL')
-
-      const fullPath = match[1] // e.g. "task-proofs/userid/filename.jpg"
-      const bucket   = fullPath.split('/')[0]
-      const filePath = fullPath.split('/').slice(1).join('/')
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(filePath, 3600) // valid for 1 hour
-
-      if (error) throw error
-      window.open(data.signedUrl, '_blank')
-    } catch(e) {
-      // Fallback: try opening the original URL directly
-      window.open(assignment.proof_url, '_blank')
-      toast('Opening photo...', 'warn')
-    } finally { setVL(false) }
+      if (match) {
+        const fullPath = match[1]
+        const bucket   = fullPath.split('/')[0]
+        const filePath = fullPath.split('/').slice(1).join('/')
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 3600)
+        if (!error) { setPhotoModal(data.signedUrl); setVL(false); return }
+      }
+      setPhotoModal(url) // fallback to direct URL
+    } catch(e) { setPhotoModal(assignment.proof_url) }
+    finally { setVL(false) }
   }
 
   const task = assignment?.tasks
@@ -254,6 +246,27 @@ function MyTaskContent() {
             </>
           )}
         </>
+      )}
+      {/* ── PHOTO MODAL ── */}
+      {photoModal && (
+        <div onClick={()=>setPhotoModal(null)}
+          style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.92)',display:'flex',alignItems:'center',justifyContent:'center',padding:16,WebkitTapHighlightColor:'transparent'}}
+        >
+          <div onClick={e=>e.stopPropagation()} style={{position:'relative',maxWidth:'100%',maxHeight:'90vh'}}>
+            <img src={photoModal} alt="Proof"
+              style={{maxWidth:'100%',maxHeight:'85vh',borderRadius:12,objectFit:'contain',display:'block',boxShadow:'0 0 40px rgba(0,0,0,.8)'}}
+              onError={()=>setPhotoModal(null)}
+            />
+            <button onClick={()=>setPhotoModal(null)}
+              style={{position:'absolute',top:-14,right:-14,width:32,height:32,borderRadius:'50%',background:'#FF6B6B',border:'none',color:'#fff',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,lineHeight:1}}>
+              ✕
+            </button>
+            <a href={photoModal} download="proof.jpg"
+              style={{display:'block',marginTop:10,textAlign:'center',color:'#7DF9AA',fontSize:13,fontWeight:700,textDecoration:'none'}}>
+              ⬇️ Save Photo
+            </a>
+          </div>
+        </div>
       )}
     </div>
   )
