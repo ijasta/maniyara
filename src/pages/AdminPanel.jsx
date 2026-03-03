@@ -291,13 +291,25 @@ function MemberCard({ m, task, assign, toast, onDone }) {
     if (!confirm(`Set new password for ${m.name}?\n\nMake sure to tell them their new password!`)) return
     setPwLoading(true)
     try {
-      // Use supabase.functions.invoke — handles auth token automatically
-      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-        body: { user_id: m.auth_id || m.id, new_password: newPw }
-      })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-      toast(`✅ Password changed! Tell ${m.name} their new password: ${newPw}`)
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not logged in')
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({ user_id: m.id, new_password: newPw })
+        }
+      )
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed')
+      toast(`✅ Password changed! Tell ${m.name}: ${newPw}`)
       setNewPw('')
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setPwLoading(false) }
