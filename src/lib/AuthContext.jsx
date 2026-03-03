@@ -38,14 +38,18 @@ export function AuthProvider({ children }) {
       const p = await getMemberProfile(userId)
       setProfile(p)
 
-      // Log sign in — only once per session, only for SIGNED_IN event
-      if ((event === 'SIGNED_IN') && !loggedRef.current && p?.status === 'approved') {
+      // Log sign in — fires on SIGNED_IN (fresh login) only, not on page refresh
+      // INITIAL_SESSION = page refresh (already logged in) — skip
+      // SIGNED_IN = actual new login — log it
+      const isActualLogin = event === 'SIGNED_IN'
+      if (isActualLogin && !loggedRef.current && p?.status === 'approved') {
         loggedRef.current = true
-        await supabase.from('logs').insert({
+        const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        supabase.from('logs').insert({
           action:  `${p.name} logged in`,
           actor:   p.name,
-          details: `${p.is_admin ? 'Admin' : 'Member'} · ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-        }).then(() => {}).catch(() => {}) // silent fail — don't block login
+          details: `${p.is_admin ? 'Admin' : 'Member'} · ${time}`
+        }).catch(() => {})
       }
     } catch {
       setProfile(null)
