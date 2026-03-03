@@ -7,6 +7,10 @@ const PROXY_URL         = import.meta.env.VITE_SUPABASE_PROXY_URL
 // Simple reliable proxy — rewrites supabase.co calls through Cloudflare Worker
 // Fixes Jio mobile data blocking of supabase.co
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
   ...(PROXY_URL ? {
     global: {
       fetch: (url, options) => {
