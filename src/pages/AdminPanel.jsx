@@ -291,17 +291,12 @@ function MemberCard({ m, task, assign, toast, onDone }) {
     if (!confirm(`Set new password for ${m.name}?\n\nMake sure to tell them their new password!`)) return
     setPwLoading(true)
     try {
-      // Get current session token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not logged in')
-
       const res = await fetch(
         `https://fnnnetofvsggioysairt.supabase.co/functions/v1/admin-reset-password`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
           },
           body: JSON.stringify({ user_id: m.id, new_password: newPw })
