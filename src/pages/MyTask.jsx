@@ -32,23 +32,52 @@ function MyTaskContent() {
     if (!proof) { toast('Upload a photo first! 📸','warn'); return }
     setSub(true)
 
-    // ── OPTIMISTIC UPDATE ──
-    // Mark done in UI instantly — user doesnt wait for upload
-    setAss(prev => ({ ...prev, done: true, done_at: new Date().toISOString(), proof_url: proof.url }))
-    toast('✅ Task marked as done! Photo uploading in background...')
-    setSub(false)
-    setProof(null)
+    try {
+      const now = new Date().toISOString()
+      const deleteAt = new Date(Date.now() + 3 * 86400000).toISOString()
 
-    // Upload + DB update happens silently in background
-    markTaskDone(assignment.id, user.id, proof.file)
-      .then(() => {
-        load() // refresh silently once done
-      })
-      .catch(e => {
-        // If it fails, revert the optimistic update
-        toast('Upload failed — please try again: '+e.message,'error')
-        setAss(prev => ({ ...prev, done: false, done_at: null, proof_url: null }))
-      })
+      // ── STEP 1: Mark done in DB immediately (no photo yet) ──
+      await supabase.from('assignments').update({
+        done: true,
+        done_at: now,
+        proof_expires_at: deleteAt
+      }).eq('id', assignment.id)
+
+      // Update member score+streak immediately too
+      const { data: m } = await supabase.from('members').select('score,streak').eq('id', user.id).single()
+      await supabase.from('members').update({
+        score: (m?.score||0) + 10,
+        streak: (m?.streak||0) + 1
+      }).eq('id', user.id)
+
+      // ── STEP 2: Update UI instantly ──
+      setAss(prev => ({ ...prev, done: true, done_at: now }))
+      toast('✅ Task marked as done! Photo uploading in background...')
+      setSub(false)
+      setProof(null)
+
+      // ── STEP 3: Upload photo silently in background ──
+      if (proof.file) {
+        const ext  = proof.file.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}.${ext}`
+        supabase.storage.from('task-proofs').upload(path, proof.file, { upsert: true })
+          .then(({ error: ue }) => {
+            if (!ue) {
+              const { data: ud } = supabase.storage.from('task-proofs').getPublicUrl(path)
+              // Update proof_url silently — non-blocking
+              supabase.from('assignments').update({
+                proof_url: ud.publicUrl,
+                proof_path: path
+              }).eq('id', assignment.id).then(() => load())
+            }
+          })
+          .catch(() => {}) // silent fail — task is already marked done
+      }
+
+    } catch(e) {
+      toast('Failed: '+e.message,'error')
+      setSub(false)
+    }
   }
 
   // Opens proof photo in new tab using a fresh signed URL (avoids expired token issue)
