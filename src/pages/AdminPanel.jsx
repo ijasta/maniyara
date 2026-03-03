@@ -1096,17 +1096,78 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
           ))}
         </div>
       </div>
-      <SecHead title="📋 Task Settings"/>
-      <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
-          {[{label:'Active Tasks',value:tasks?.filter(t=>t.active)?.length||0,color:'#7DF9AA'},{label:'Assigned',value:assigns?.length||0,color:'#4D96FF'},{label:'Completed',value:assigns?.filter(a=>a.done)?.length||0,color:'#FFD93D'}].map(s=>(
+      <SecHead title="📸 Uploaded Photos"/>
+      <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.12)',borderRadius:13,padding:14,marginBottom:14}}>
+        {/* Stats row */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:14}}>
+          {[
+            {label:'With Photo',  value:assigns?.filter(a=>a.proof_url)?.length||0, color:'#7DF9AA'},
+            {label:'No Photo',    value:assigns?.filter(a=>a.done&&!a.proof_url)?.length||0, color:'#FF6B6B'},
+          ].map(s=>(
             <div key={s.label} style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:10,padding:'10px',textAlign:'center'}}>
               <div style={{fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:900,color:s.color}}>{s.value}</div>
               <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:3}}>{s.label}</div>
             </div>
           ))}
         </div>
-        <Btn variant="danger" full onClick={async()=>{if(!confirm(`Reset done status for Week ${week}?`))return;await resetWeekDoneStatus(week);toast('Done status reset','warn');onDone()}}>🔄 Reset Done Status</Btn>
+
+        {/* Per-member photo delete */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#8890b0',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Delete by Member</div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {assigns?.filter(a=>a.proof_url).length === 0 ? (
+              <div style={{fontSize:12,color:'#4a5070',padding:'10px 0',textAlign:'center'}}>No uploaded photos this week</div>
+            ) : assigns?.filter(a=>a.proof_url).map(a => {
+              const m = members.find(x=>x.id===a.member_id)
+              const t = tasks.find(x=>x.id===a.task_id)
+              return (
+                <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,.03)',borderRadius:9,padding:'9px 11px',border:'1px solid rgba(255,255,255,.06)'}}>
+                  <div style={{width:30,height:30,borderRadius:8,background:`${m?.color||'#7DF9AA'}22`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{m?.avatar||'👤'}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m?.name||'Unknown'}</div>
+                    <div style={{fontSize:11,color:'#4a5070'}}>{t?.emoji} {t?.name||'Task'}</div>
+                  </div>
+                  <button onClick={async()=>{
+                    if(!confirm(`Delete ${m?.name}'s proof photo?`)) return
+                    try {
+                      // Delete from storage if path exists
+                      if(a.proof_path) {
+                        await supabase.storage.from('task-proofs').remove([a.proof_path])
+                      }
+                      // Clear proof fields from assignment
+                      await supabase.from('assignments').update({
+                        proof_url: null, proof_path: null
+                      }).eq('id', a.id)
+                      toast(`${m?.name}'s photo deleted 🗑️`,'warn')
+                      onDone()
+                    } catch(e) { toast('Failed: '+e.message,'error') }
+                  }}
+                    style={{padding:'7px 12px',borderRadius:8,border:'1px solid rgba(255,107,107,.3)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:12,fontWeight:700,flexShrink:0,fontFamily:'Rajdhani,sans-serif'}}>
+                    🗑️ Delete
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Delete all photos */}
+        <Btn variant="danger" full onClick={async()=>{
+          const withPhotos = assigns?.filter(a=>a.proof_url) || []
+          if(withPhotos.length===0) { toast('No photos to delete','warn'); return }
+          if(!confirm(`Delete ALL ${withPhotos.length} proof photos this week?`)) return
+          try {
+            // Delete files from storage
+            const paths = withPhotos.filter(a=>a.proof_path).map(a=>a.proof_path)
+            if(paths.length>0) await supabase.storage.from('task-proofs').remove(paths)
+            // Clear proof fields
+            await Promise.all(withPhotos.map(a=>
+              supabase.from('assignments').update({proof_url:null,proof_path:null}).eq('id',a.id)
+            ))
+            toast(`Deleted ${withPhotos.length} photos 🗑️`,'warn')
+            onDone()
+          } catch(e) { toast('Failed: '+e.message,'error') }
+        }}>☢️ Delete ALL Photos This Week</Btn>
       </div>
       <SecHead title="🔔 App Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
