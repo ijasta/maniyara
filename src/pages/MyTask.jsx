@@ -31,12 +31,24 @@ function MyTaskContent() {
   const handleSubmit = async () => {
     if (!proof) { toast('Upload a photo first! 📸','warn'); return }
     setSub(true)
-    try {
-      await markTaskDone(assignment.id, user.id, proof.file)
-      toast('Task marked as done! ✅')
-      load()
-    } catch(e) { toast('Failed: '+e.message,'error') }
-    finally { setSub(false) }
+
+    // ── OPTIMISTIC UPDATE ──
+    // Mark done in UI instantly — user doesnt wait for upload
+    setAss(prev => ({ ...prev, done: true, done_at: new Date().toISOString(), proof_url: proof.url }))
+    toast('✅ Task marked as done! Photo uploading in background...')
+    setSub(false)
+    setProof(null)
+
+    // Upload + DB update happens silently in background
+    markTaskDone(assignment.id, user.id, proof.file)
+      .then(() => {
+        load() // refresh silently once done
+      })
+      .catch(e => {
+        // If it fails, revert the optimistic update
+        toast('Upload failed — please try again: '+e.message,'error')
+        setAss(prev => ({ ...prev, done: false, done_at: null, proof_url: null }))
+      })
   }
 
   // Opens proof photo in new tab using a fresh signed URL (avoids expired token issue)
