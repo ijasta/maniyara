@@ -90,19 +90,74 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
             <div style={{fontFamily:'Orbitron,monospace',fontSize:11,color:'#FFD93D',letterSpacing:.5}}>{cd}</div>
           </div>
 
-          {/* Profile preview — clickable, goes to /profile */}
+          {/* Profile card — glowing, clickable */}
           <NavLink to="/profile" style={({isActive})=>({
-            display:'flex',alignItems:'center',gap:10,
-            background:isActive?'rgba(125,249,170,.08)':'#131525',
-            border:`1px solid ${isActive?'rgba(125,249,170,.25)':'rgba(125,249,170,.09)'}`,
-            borderRadius:9,padding:'9px 11px',marginBottom:8,textDecoration:'none',transition:'all .15s'
+            display:'block', textDecoration:'none', marginBottom:10,
+            borderRadius:14, overflow:'hidden', transition:'all .2s',
+            boxShadow: isActive
+              ? `0 0 24px ${profile?.color||'#7DF9AA'}40`
+              : '0 4px 16px rgba(0,0,0,.4)',
           })}>
-            <div style={{width:32,height:32,borderRadius:'50%',background:profile?.color||'#7DF9AA',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{profile?.avatar||'🧑'}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name}</div>
-              <div style={{fontSize:10,color:profile?.is_admin?'#7DF9AA':'#8890b0',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em'}}>{profile?.is_admin?'⚙ Admin':'👤 Member'}</div>
-            </div>
-            <span style={{fontSize:11,color:'#4a5070'}}>›</span>
+            {({isActive}) => (
+              <div style={{
+                background: isActive
+                  ? `linear-gradient(135deg, ${profile?.color||'#7DF9AA'}18, rgba(125,249,170,.06))`
+                  : 'linear-gradient(135deg,#131525,#0d0e1a)',
+                border: `1px solid ${isActive ? profile?.color||'#7DF9AA' : 'rgba(125,249,170,.12)'}`,
+                borderRadius:14, padding:'12px 13px', position:'relative', overflow:'hidden',
+              }}>
+                {/* Top shimmer line */}
+                <div style={{position:'absolute',top:0,left:0,right:0,height:2,
+                  background:`linear-gradient(90deg,transparent,${profile?.color||'#7DF9AA'},transparent)`,
+                  opacity: isActive ? 1 : 0.4}}/>
+
+                <div style={{display:'flex',alignItems:'center',gap:11}}>
+                  {/* Avatar with glow ring */}
+                  <div style={{position:'relative',flexShrink:0}}>
+                    <div style={{
+                      width:40,height:40,borderRadius:12,
+                      background:`linear-gradient(135deg,${profile?.color||'#7DF9AA'}33,${profile?.color||'#7DF9AA'}11)`,
+                      border:`2px solid ${profile?.color||'#7DF9AA'}66`,
+                      display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,
+                      boxShadow:`0 0 12px ${profile?.color||'#7DF9AA'}33`
+                    }}>{profile?.avatar||'🧑'}</div>
+                    {/* Online dot */}
+                    <div style={{position:'absolute',bottom:0,right:0,width:10,height:10,borderRadius:'50%',
+                      background:'#7DF9AA',border:'2px solid #0d0e1a',
+                      boxShadow:'0 0 6px rgba(125,249,170,.8)'}}/>
+                  </div>
+
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:800,color:'#E8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:.3}}>
+                      {profile?.name||'Loading...'}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
+                      <span style={{
+                        fontSize:9,padding:'2px 7px',borderRadius:99,fontWeight:700,
+                        letterSpacing:'.07em',textTransform:'uppercase',
+                        background: profile?.is_admin ? 'rgba(125,249,170,.15)' : 'rgba(77,150,255,.12)',
+                        color: profile?.is_admin ? '#7DF9AA' : '#4D96FF',
+                        border: `1px solid ${profile?.is_admin ? 'rgba(125,249,170,.3)' : 'rgba(77,150,255,.25)'}`,
+                      }}>{profile?.is_admin ? '⚙ Admin' : '● Member'}</span>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,flexShrink:0}}>
+                    <span style={{fontSize:14,color:profile?.color||'#7DF9AA',opacity:.7}}>›</span>
+                  </div>
+                </div>
+
+                {/* Username row */}
+                {profile?.username && (
+                  <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.05)',
+                    fontSize:10,color:'#4a5070',fontWeight:600,letterSpacing:'.04em',display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{color:'#4a5070'}}>@</span>
+                    <span style={{color:'#6a7090'}}>{profile.username}</span>
+                    <span style={{marginLeft:'auto',fontSize:9,color:'#4a5070'}}>tap to edit</span>
+                  </div>
+                )}
+              </div>
+            )}
           </NavLink>
 
           <nav style={{display:'flex',flexDirection:'column',gap:2,flex:1}}>
@@ -126,9 +181,29 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       {/* ── MOBILE BOTTOM NAV ── */}
       <nav className="mob-nav">
         {links.map(l => (
-          <NavLink key={l.to} to={l.to} end={l.end} className={({isActive})=>`mob-nb${isActive?' mob-active':''}`}>
-            <span style={{fontSize:21,lineHeight:1}}>{l.icon}</span>
-            <span>{l.short}</span>
+          <NavLink key={l.to} to={l.to} end={l.end}
+            className={({isActive})=>`mob-nb${isActive?' mob-active':''}`}
+            style={l.to==='/profile' ? {flex:'0 0 64px'} : {}}>
+            {({isActive}) => l.to === '/profile' ? (
+              // Profile tab — show avatar with glow
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <div style={{
+                  width:28,height:28,borderRadius:9,
+                  background:`linear-gradient(135deg,${profile?.color||'#7DF9AA'}44,${profile?.color||'#7DF9AA'}22)`,
+                  border:`2px solid ${isActive ? profile?.color||'#7DF9AA' : (profile?.color||'#7DF9AA')+'55'}`,
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,
+                  boxShadow: isActive ? `0 0 10px ${profile?.color||'#7DF9AA'}66` : 'none',
+                  transition:'all .2s'
+                }}>{profile?.avatar||'👤'}</div>
+                <span style={{fontSize:8,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',
+                  color: isActive ? profile?.color||'#7DF9AA' : '#6a7090'}}>Me</span>
+              </div>
+            ) : (
+              <>
+                <span style={{fontSize:21,lineHeight:1}}>{l.icon}</span>
+                <span>{l.short}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -162,6 +237,8 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           -webkit-tap-highlight-color:transparent;
         }
         .mob-active { color:#7DF9AA !important; }
+        .mob-nb { transition: all .15s; }
+        .mob-nb:active { transform: scale(.92); }
       `}</style>
     </>
   )
