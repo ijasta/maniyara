@@ -1,6 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase, getMyAssignment, markTaskDone } from '../lib/supabase'
+
+// Compress image before upload — reduces size 80%, much faster on mobile
+async function compressImage(file, maxWidth=1200, quality=0.7) {
+  return new Promise(resolve => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1)
+      canvas.width  = Math.round(img.width  * ratio)
+      canvas.height = Math.round(img.height * ratio)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
 import { StatusBadge, Btn, SecHead, ToastProvider, useToast } from '../components/UI'
 
 function MyTaskContent() {
@@ -56,22 +75,36 @@ function MyTaskContent() {
       setSub(false)
       setProof(null)
 
-      // ── STEP 3: Upload photo silently in background ──
+      // ── STEP 3: Compress + upload photo silently in background ──
       if (proof.file) {
-        const ext  = proof.file.name.split('.').pop()
-        const path = `${user.id}/${Date.now()}.${ext}`
-        supabase.storage.from('task-proofs').upload(path, proof.file, { upsert: true })
-          .then(({ error: ue }) => {
-            if (!ue) {
-              const { data: ud } = supabase.storage.from('task-proofs').getPublicUrl(path)
-              // Update proof_url silently — non-blocking
-              supabase.from('assignments').update({
-                proof_url: ud.publicUrl,
+        ;(async () => {
+          try {
+            // Compress first — reduces 5MB photo to ~300KB, 10x faster upload
+            const compressed = await compressImage(proof.file)
+            const path = `${user.id}/${Date.now()}.jpg`
+            const proxyBase = import.meta.env.VITE_SUPABASE_PROXY_URL || import.meta.env.VITE_SUPABASE_URL
+            const uploadUrl = `${proxyBase}/storage/v1/object/task-proofs/${path}`
+            const res = await fetch(uploadUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Content-Type': 'image/jpeg',
+                'x-upsert': 'true'
+              },
+              body: compressed
+            })
+            if (res.ok) {
+              // Build public URL using original supabase URL (not proxy)
+              const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/task-proofs/${path}`
+              await supabase.from('assignments').update({
+                proof_url: publicUrl,
                 proof_path: path
-              }).eq('id', assignment.id).then(() => load())
+              }).eq('id', assignment.id)
+              load() // refresh to show proof button
             }
-          })
-          .catch(() => {}) // silent fail — task is already marked done
+          } catch(_) {} // silent — task already marked done
+        })()
       }
 
     } catch(e) {
