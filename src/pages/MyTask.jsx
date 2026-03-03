@@ -114,23 +114,31 @@ function MyTaskContent() {
     }
   }
 
-  // Show proof photo in inline modal — works on all mobile browsers
-  const viewProof = async () => {
+  // Show proof photo in inline modal — uses proxy URL so Jio mobile can load it
+  // NOTE: We use public URL (not signed URL) through proxy.
+  // Signed URLs embed the original domain in the token and break when domain is swapped.
+  const viewProof = () => {
     if (!assignment?.proof_url) return
-    setVL(true)
-    try {
-      const url = assignment.proof_url
-      const match = url.match(/\/object\/(?:public|sign)\/([^?]+)/)
-      if (match) {
-        const fullPath = match[1]
-        const bucket   = fullPath.split('/')[0]
-        const filePath = fullPath.split('/').slice(1).join('/')
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 3600)
-        if (!error) { setPhotoModal(data.signedUrl); setVL(false); return }
-      }
-      setPhotoModal(url) // fallback to direct URL
-    } catch(e) { setPhotoModal(assignment.proof_url) }
-    finally { setVL(false) }
+    const proxyBase = import.meta.env.VITE_SUPABASE_PROXY_URL
+    const supaBase  = import.meta.env.VITE_SUPABASE_URL
+
+    // Build public storage URL through proxy
+    // proof_url looks like: https://xxx.supabase.co/storage/v1/object/public/task-proofs/uid/file.jpg
+    // or might be a signed URL — extract the path and rebuild as public
+    let photoUrl = assignment.proof_url
+
+    // Extract path after /object/public/ or /object/sign/
+    const match = photoUrl.match(/\/object\/(?:public|sign(?:ed)?(?:\/v\d)?)\/(.+?)(\?|$)/)
+    if (match) {
+      // Rebuild as clean public URL through proxy
+      const base = proxyBase || supaBase
+      photoUrl = `${base}/storage/v1/object/public/${match[1]}`
+    } else if (proxyBase) {
+      // Just swap domain
+      photoUrl = photoUrl.replace(supaBase, proxyBase)
+    }
+
+    setPhotoModal(photoUrl)
   }
 
   const task = assignment?.tasks
@@ -180,7 +188,6 @@ function MyTaskContent() {
               <div style={{marginTop:16}}>
                 <button
                   onClick={viewProof}
-                  disabled={viewLoading}
                   style={{
                     width:'100%',
                     padding:'14px 16px',
