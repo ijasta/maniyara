@@ -471,13 +471,13 @@ function LogsTab({ logs, members, onClear }) {
   const [filter, setFilter] = useState('all')
 
   const isFund   = a => { const x=a?.toLowerCase()||''; return x.includes('fund')||x.includes('transaction')||x.includes('treasurer') }
-  const isLogin  = a => { const x=a?.toLowerCase()||''; return x.includes('login')||x.includes('signup')||x.includes('sign in')||x.includes('register')||x.includes('approv')||x.includes('reject')||x.includes('joined') }
+  const isLogin  = a => { const x=a?.toLowerCase()||''; return x.includes('login')||x.includes('logged')||x.includes('signup')||x.includes('sign in')||x.includes('register')||x.includes('approv')||x.includes('reject')||x.includes('joined') }
 
   const getIcon  = a => isFund(a) ? '🏦' : isLogin(a) ? '👤' : '📋'
-  const getColor = a => isFund(a) ? '#FFD93D' : isLogin(a) ? '#7DF9AA' : '#4a5070'
+  const getColor = a => isFund(a) ? '#FFD93D' : isLogin(a) ? '#7DF9AA' : '#8890b0'
 
-  // Only show fund + login/member logs
-  const relevant = logs.filter(l => isFund(l.action) || isLogin(l.action))
+  // Show ALL logs — filter by type
+  const relevant = logs  // show everything
   const filtered = filter==='all' ? relevant : filter==='fund' ? relevant.filter(l=>isFund(l.action)) : relevant.filter(l=>isLogin(l.action))
 
   const formatTime = ts => {
@@ -489,16 +489,17 @@ function LogsTab({ logs, members, onClear }) {
     return new Date(ts).toLocaleDateString('en-IN',{day:'numeric',month:'short'})
   }
 
-  const fundLogs  = relevant.filter(l=>isFund(l.action))
-  const loginLogs = relevant.filter(l=>isLogin(l.action))
+  const fundLogs  = logs.filter(l=>isFund(l.action))
+  const loginLogs = logs.filter(l=>isLogin(l.action))
 
   return (
     <div>
       {/* Stats */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
         {[
-          {label:'🏦 Fund Logs',  value:fundLogs.length,  color:'#FFD93D'},
-          {label:'👤 Member Logs',value:loginLogs.length, color:'#7DF9AA'},
+          {label:'Total',          value:logs.length,       color:'#7DF9AA'},
+          {label:'🏦 Fund',        value:fundLogs.length,   color:'#FFD93D'},
+          {label:'👤 Logins',      value:loginLogs.length,  color:'#4D96FF'},
         ].map(s=>(
           <div key={s.label} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:11,padding:'13px 12px',textAlign:'center'}}>
             <div style={{fontFamily:'Orbitron,monospace',fontSize:22,fontWeight:900,color:s.color}}>{s.value}</div>
