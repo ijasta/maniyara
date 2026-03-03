@@ -296,7 +296,7 @@ function MemberCard({ m, task, assign, toast, onDone }) {
       if (!session) throw new Error('Not logged in')
 
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+        `https://fnnnetofvsggioysairt.supabase.co/functions/v1/admin-reset-password`,
         {
           method: 'POST',
           headers: {
@@ -307,8 +307,9 @@ function MemberCard({ m, task, assign, toast, onDone }) {
           body: JSON.stringify({ user_id: m.id, new_password: newPw })
         }
       )
-      const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error || 'Failed')
+      let data = {}
+      try { data = await res.json() } catch(_) {}
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
       toast(`✅ Password changed! Tell ${m.name}: ${newPw}`)
       setNewPw('')
     } catch(e) { toast('Failed: '+e.message,'error') }
@@ -999,12 +1000,12 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
     <div>
       <SecHead title="🏠 House Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        {[['House Name','house_name',settings?.house_name,'e.g. Maniyara'],['App Tagline','app_tagline',settings?.app_tagline,'e.g. Where legends live'],['House Address','house_address',settings?.house_address,'Optional']].map(([lb,key,val,ph])=>(
-          <div key={key} style={{marginBottom:12}}>
-            <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
-            <input type="text" defaultValue={val||''} placeholder={ph} onBlur={async e=>{if(e.target.value!==val)await save({[key]:e.target.value})}} style={{...inp,padding:'10px 13px'}}/>
-          </div>
-        ))}
+        <div style={{marginBottom:12}}>
+          <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>House Name</label>
+          <input type="text" defaultValue={settings?.house_name||''} placeholder="e.g. Maniyara"
+            onBlur={async e=>{if(e.target.value!==(settings?.house_name||''))await save({house_name:e.target.value})}}
+            style={{...inp,padding:'10px 13px'}}/>
+        </div>
       </div>
       <SecHead title="📅 Week Control"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(77,150,255,.15)',borderRadius:13,padding:14,marginBottom:14}}>
@@ -1038,12 +1039,13 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
       </div>
       <SecHead title="🔔 App Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        {[['App URL','app_url',settings?.app_url,'https://maniyara.pages.dev'],['Contact Email','contact_email',settings?.contact_email,'admin@email.com']].map(([lb,key,val,ph])=>(
-          <div key={key} style={{marginBottom:12}}>
-            <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>{lb}</label>
-            <input type="text" defaultValue={val||''} placeholder={ph} onBlur={async e=>{if(e.target.value!==val)await save({[key]:e.target.value})}} style={{...inp,padding:'10px 13px'}}/>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',background:'rgba(125,249,170,.04)',borderRadius:9,border:'1px solid rgba(125,249,170,.1)'}}>
+          <span style={{fontSize:20}}>🌐</span>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:'#7DF9AA'}}>maniyara.pages.dev</div>
+            <div style={{fontSize:11,color:'#4a5070',marginTop:2}}>Cloudflare Pages · Auto-deployed from GitHub</div>
           </div>
-        ))}
+        </div>
       </div>
       <SecHead title="⚠️ Danger Zone"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.15)',borderRadius:13,padding:14}}>
