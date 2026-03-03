@@ -12,6 +12,7 @@ function DashContent() {
   const [week,     setWeek]     = useState(1)
   const [loading,  setLoading]  = useState(true)
   const [filter,   setFilter]   = useState('all')
+  const [photoModal, setPhotoModal] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -135,13 +136,39 @@ function DashContent() {
             )}
             {a?.proof_url && (
               <div style={{marginTop:6,paddingLeft:55}}>
-                <a href={a.proof_url} target="_blank" rel="noreferrer"
-                  style={{fontSize:11,color:'#7DF9AA',fontWeight:700,textDecoration:'none'}}>📸 View Proof Photo</a>
+                <button onClick={()=>setPhotoModal(a.proof_url)}
+                  style={{fontSize:11,color:'#7DF9AA',fontWeight:700,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline',fontFamily:'inherit'}}>
+                  📸 View Proof Photo
+                </button>
               </div>
             )}
           </div>
         )
       })}
+      <PhotoModal url={photoModal} onClose={()=>setPhotoModal(null)}/>
+    </div>
+  )
+}
+
+// Photo modal shared component
+function PhotoModal({ url, onClose }) {
+  if (!url) return null
+  return (
+    <div onClick={onClose}
+      style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.92)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{position:'relative',maxWidth:'100%',maxHeight:'90vh'}}>
+        <img src={url} alt="Proof"
+          style={{maxWidth:'100%',maxHeight:'85vh',borderRadius:12,objectFit:'contain',display:'block',boxShadow:'0 0 40px rgba(0,0,0,.8)'}}
+          onError={onClose}/>
+        <button onClick={onClose}
+          style={{position:'absolute',top:-14,right:-14,width:32,height:32,borderRadius:'50%',background:'#FF6B6B',border:'none',color:'#fff',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>
+          ✕
+        </button>
+        <a href={url} download="proof.jpg"
+          style={{display:'block',marginTop:10,textAlign:'center',color:'#7DF9AA',fontSize:13,fontWeight:700,textDecoration:'none'}}>
+          ⬇️ Save Photo
+        </a>
+      </div>
     </div>
   )
 }
