@@ -136,7 +136,19 @@ function DashContent() {
             )}
             {a?.proof_url && (
               <div style={{marginTop:6,paddingLeft:55}}>
-                <button onClick={()=>setPhotoModal(a.proof_url)}
+                <button onClick={()=>{
+                    const proxyBase = import.meta.env.VITE_SUPABASE_PROXY_URL
+                    const supaBase  = import.meta.env.VITE_SUPABASE_URL
+                    let photoUrl = a.proof_url
+                    const match = photoUrl.match(/\/object\/(?:public|sign(?:ed)?(?:\/v\d)?)\/(.+?)(\?|$)/)
+                    if (match) {
+                      const base = proxyBase || supaBase
+                      photoUrl = `${base}/storage/v1/object/public/${match[1]}`
+                    } else if (proxyBase) {
+                      photoUrl = photoUrl.replace(supaBase, proxyBase)
+                    }
+                    setPhotoModal(photoUrl)
+                  }}
                   style={{fontSize:11,color:'#7DF9AA',fontWeight:700,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline',fontFamily:'inherit'}}>
                   📸 View Proof Photo
                 </button>
