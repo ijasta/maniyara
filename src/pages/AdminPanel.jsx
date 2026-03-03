@@ -291,16 +291,12 @@ function MemberCard({ m, task, assign, toast, onDone }) {
     if (!confirm(`Set new password for ${m.name}?\n\nMake sure to tell them their new password!`)) return
     setPwLoading(true)
     try {
-      const res = await fetch(
-        'https://fnnnetofvsggioysairt.supabase.co/functions/v1/admin-reset-password',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: m.auth_id || m.id, new_password: newPw })
-        }
-      )
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      // Use supabase.functions.invoke — handles auth token automatically
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { user_id: m.auth_id || m.id, new_password: newPw }
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
       toast(`✅ Password changed! Tell ${m.name} their new password: ${newPw}`)
       setNewPw('')
     } catch(e) { toast('Failed: '+e.message,'error') }
