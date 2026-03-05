@@ -240,7 +240,7 @@ function AdminContent() {
         </div>
       )}
 
-      {/* ── MEMBERS ── */
+      {/* ── MEMBERS ── */}
       {tab==='members' && (
         <div>
           {/* Summary strip */}
