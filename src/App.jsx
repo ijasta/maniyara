@@ -15,7 +15,6 @@ import AdminPanel from './pages/AdminPanel'
 import TaskAssigner from './pages/TaskAssigner'
 import MaintenancePage from './pages/MaintenancePage'
 import LoadingScreen from './components/LoadingScreen'
-import CookingParty from './pages/CookingParty'
 
 function Guard({ children, adminOnly }) {
   const { user, profile, loading } = useAuth()
