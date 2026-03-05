@@ -680,9 +680,23 @@ function CookingPartyContent() {
                     {new Date(party.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
                   </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0,paddingRight:isAdmin?70:0}}>
-                  <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#FF9A3C'}}>{fmt(totalCost)}</div>
-                  <div style={{fontSize:10,color:'#556080',marginTop:2}}>{partyMems} members · {fmt(splitAmt)} each</div>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:5,flexShrink:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#FF9A3C'}}>{fmt(totalCost)}</div>
+                    {isAdmin && (
+                      <div style={{display:'flex',gap:5}} onClick={e=>e.stopPropagation()}>
+                        <button onClick={e=>{ e.stopPropagation(); setEditParty(party) }}
+                          style={{width:28,height:28,borderRadius:8,border:'1px solid rgba(77,150,255,.25)',background:'rgba(77,150,255,.08)',color:'#4D96FF',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>✏️</button>
+                        <button onClick={async e=>{
+                          e.stopPropagation()
+                          if(!confirm(`Delete "${party.name}" and all its items?`)) return
+                          try { await deleteCookingParty(party.id); toast('Deleted','warn'); load() }
+                          catch(e){ toast('Failed','error') }
+                        }} style={{width:28,height:28,borderRadius:8,border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>🗑️</button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:10,color:'#556080'}}>{partyMems} members · {fmt(splitAmt)} each</div>
                 </div>
               </div>
 
@@ -725,29 +739,7 @@ function CookingPartyContent() {
               )}
             </div>
 
-            {/* Admin actions: edit + delete */}
-            {isAdmin && (
-              <div style={{position:'absolute',top:12,right:12,display:'flex',gap:6}} onClick={e=>e.stopPropagation()}>
-                <button onClick={e=>{ e.stopPropagation(); setEditParty(party) }}
-                  style={{width:28,height:28,borderRadius:8,
-                    border:'1px solid rgba(77,150,255,.25)',background:'rgba(77,150,255,.08)',
-                    color:'#4D96FF',cursor:'pointer',fontSize:12,
-                    display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
-                  ✏️
-                </button>
-                <button onClick={async e=>{
-                  e.stopPropagation()
-                  if(!confirm(`Delete "${party.name}" and all its items?`)) return
-                  try { await deleteCookingParty(party.id); toast('Deleted','warn'); load() }
-                  catch(e){ toast('Failed','error') }
-                }} style={{width:28,height:28,borderRadius:8,
-                  border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',
-                  color:'#FF6B6B',cursor:'pointer',fontSize:12,
-                  display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
-                  🗑️
-                </button>
-              </div>
-            )}
+
           </div>
         )
       })}
