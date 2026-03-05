@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
-import { getCookingParties, createCookingParty, updatePartyMembers, addCookingItem, updateCookingItem, deleteCookingItem, deleteCookingParty, getMembers } from '../lib/supabase'
+import { getCookingParties, createCookingParty, updatePartyMembers, addCookingItem, updateCookingItem, deleteCookingItem, deleteCookingParty, getMembers, getSettings } from '../lib/supabase'
 import { Avatar, ToastProvider, useToast, inp } from '../components/UI'
 
 const fmt  = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 })
@@ -104,11 +104,10 @@ function AddItemSheet({ partyId, onClose, onDone }) {
 
   const submit = async () => {
     if (!name.trim())         { toast('Enter item name','warn'); return }
-    if (!rate || +rate <= 0)  { toast('Enter rate','warn'); return }
     if (!qty  || +qty  <= 0)  { toast('Enter quantity','warn'); return }
     setL(true)
     try {
-      await addCookingItem(partyId, name.trim(), +rate, +qty, unit)
+      await addCookingItem(partyId, name.trim(), rate ? +rate : 0, +qty, unit)
       toast('✅ Item added!'); onDone(); onClose()
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setL(false) }
@@ -133,10 +132,10 @@ function AddItemSheet({ partyId, onClose, onDone }) {
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
             <div>
-              <label style={lbl}>Rate (₹)</label>
+              <label style={lbl}>Rate (₹) — optional, add after buying</label>
               <input type="number" inputMode="decimal" value={rate} onChange={e=>setRate(e.target.value)}
                 placeholder="0.00"
-                style={{...inp,fontSize:'18px',fontFamily:'Orbitron,monospace',fontWeight:700,color:'#7DF9AA',background:'#131628',border:'1px solid rgba(125,249,170,.15)'}}/>
+                style={{...inp,fontSize:'16px',fontFamily:'Orbitron,monospace',fontWeight:700,color:'#7DF9AA',background:'#131628',border:'1px solid rgba(125,249,170,.15)'}}/>
             </div>
             <div>
               <label style={lbl}>Qty</label>
@@ -367,10 +366,11 @@ function PartyDetail({ party, allMembers, isAdmin, onBack, onRefresh }) {
 
 // ── MAIN PAGE ─────────────────────────────────────────────
 function CookingPartyContent() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const toast = useToast()
   const [parties,    setParties]   = useState([])
   const [members,    setMembers]   = useState([])
+  const [siteSettings, setSiteSettings] = useState(null)
   const [loading,    setL]         = useState(true)
   const [createSheet,setCreate]    = useState(false)
   const [selected,   setSelected]  = useState(null) // party id
@@ -379,9 +379,10 @@ function CookingPartyContent() {
 
   async function load() {
     try {
-      const [p, m] = await Promise.all([getCookingParties(), getMembers()])
+      const [p, m, s] = await Promise.all([getCookingParties(), getMembers(), getSettings()])
       setParties(p)
       setMembers(m.filter(m=>m.status==='approved'))
+      setSiteSettings(s)
       // refresh selected party data too
       if (selected) {
         const fresh = p.find(x=>x.id===selected.id)
@@ -392,6 +393,7 @@ function CookingPartyContent() {
   }
 
   const isAdmin = profile?.is_admin
+  const isKitchenManager = isAdmin || (siteSettings?.kitchen_assigner_id === user?.id)
 
   if (loading) return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:80,gap:14}}>
@@ -456,8 +458,8 @@ function CookingPartyContent() {
         </div>
       </div>
 
-      {/* CREATE BUTTON — admin only */}
-      {isAdmin && (
+      {/* CREATE BUTTON — admin or kitchen assigner */}
+      {isKitchenManager && (
         <button onClick={()=>setCreate(true)}
           style={{width:'100%',padding:'15px',borderRadius:14,marginBottom:16,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:15,cursor:'pointer',
             border:'1px solid rgba(255,154,60,.3)',background:'linear-gradient(135deg,rgba(255,154,60,.1),rgba(255,154,60,.04))',
