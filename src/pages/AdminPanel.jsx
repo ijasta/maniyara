@@ -197,6 +197,7 @@ function AdminContent() {
                   <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
                 ))}
               </select>
+            </div>
 
             {/* Kitchen Assigner */}
             <div style={{background:'#0d0e1a',border:`2px solid ${settings?.kitchen_assigner_id?'rgba(255,154,60,.3)':'rgba(255,154,60,.1)'}`,borderRadius:13,padding:14,transition:'border-color .2s'}}>
