@@ -7,10 +7,6 @@ const PROXY_URL         = import.meta.env.VITE_SUPABASE_PROXY_URL
 // Simple reliable proxy — rewrites supabase.co calls through Cloudflare Worker
 // Fixes Jio mobile data blocking of supabase.co
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
   ...(PROXY_URL ? {
     global: {
       fetch: (url, options) => {
@@ -485,5 +481,72 @@ export async function deleteFundTransaction(id) {
 
 export async function updateFundSettings(updates) {
   const { error } = await supabase.from('fund_settings').update(updates).eq('id', 1)
+  if (error) throw error
+}
+
+// ── COOKING PARTIES ───────────────────────────────────────
+export async function getCookingParties() {
+  const { data, error } = await supabase
+    .from('cooking_parties')
+    .select(`*,
+      created_by_member:members!created_by(id,name,avatar,color),
+      cooking_party_members(member_id, members(id,name,avatar,color)),
+      cooking_items(*)`)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function createCookingParty(name, date, memberIds) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('cooking_parties')
+    .insert([{ name, date, created_by: user?.id }])
+    .select().single()
+  if (error) throw error
+  if (memberIds.length > 0) {
+    const { error: me } = await supabase
+      .from('cooking_party_members')
+      .insert(memberIds.map(mid => ({ party_id: data.id, member_id: mid })))
+    if (me) throw me
+  }
+  return data
+}
+
+export async function updatePartyMembers(partyId, memberIds) {
+  const { error: de } = await supabase
+    .from('cooking_party_members').delete().eq('party_id', partyId)
+  if (de) throw de
+  if (memberIds.length > 0) {
+    const { error: ie } = await supabase
+      .from('cooking_party_members')
+      .insert(memberIds.map(mid => ({ party_id: partyId, member_id: mid })))
+    if (ie) throw ie
+  }
+}
+
+export async function addCookingItem(partyId, name, rate, quantity, unit) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase
+    .from('cooking_items')
+    .insert([{ party_id: partyId, name, rate, quantity, unit, added_by: user?.id }])
+  if (error) throw error
+}
+
+export async function updateCookingItem(id, updates) {
+  const { error } = await supabase
+    .from('cooking_items').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCookingItem(id) {
+  const { error } = await supabase
+    .from('cooking_items').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCookingParty(id) {
+  const { error } = await supabase
+    .from('cooking_parties').delete().eq('id', id)
   if (error) throw error
 }
