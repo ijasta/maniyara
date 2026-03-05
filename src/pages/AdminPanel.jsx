@@ -34,7 +34,7 @@ function AdminContent() {
       ])
       // Also fetch treasurer_id from fund_settings (it's NOT in settings table)
       const { data: fs } = await supabase.from('fund_settings').select('treasurer_id').eq('id', 1).single()
-      const merged = { ...st, treasurer_id: fs?.treasurer_id ?? null }
+      const merged = { ...st, treasurer_id: fs?.treasurer_id ?? null, kitchen_assigner_id: st?.kitchen_assigner_id ?? null }
       setPending(pend); setMembers(mem); setTasks(tk)
       setAssigns(a); setSt(merged); setLogs(lg); setWeek(w)
     } catch(e) { toast('Load error: '+e.message,'error') }
@@ -197,13 +197,50 @@ function AdminContent() {
                   <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
                 ))}
               </select>
+
+            {/* Kitchen Assigner */}
+            <div style={{background:'#0d0e1a',border:`2px solid ${settings?.kitchen_assigner_id?'rgba(255,154,60,.3)':'rgba(255,154,60,.1)'}`,borderRadius:13,padding:14,transition:'border-color .2s'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,154,60,.08)',border:'1px solid rgba(255,154,60,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>🍳</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:'#E8F0FF'}}>Kitchen Assigner</div>
+                  <div style={{fontSize:11,color:'#8890b0',marginTop:1}}>Manages cooking parties — create sessions & track items</div>
+                </div>
+                <div style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
+                  background:settings?.kitchen_assigner_id?'rgba(255,154,60,.12)':'rgba(255,255,255,.04)',
+                  border:`1px solid ${settings?.kitchen_assigner_id?'rgba(255,154,60,.25)':'rgba(255,255,255,.08)'}`,
+                  color:settings?.kitchen_assigner_id?'#FF9A3C':'#4a5070'}}>
+                  {settings?.kitchen_assigner_id?'✅ ACTIVE':'NOT SET'}
+                </div>
+              </div>
+              {settings?.kitchen_assigner_id && (() => {
+                const m = members.find(x=>x.id===settings.kitchen_assigner_id)
+                return m ? (
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'rgba(255,154,60,.06)',borderRadius:8,marginBottom:10}}>
+                    <Avatar emoji={m.avatar} color={m.color} size={26}/>
+                    <span style={{fontSize:13,fontWeight:700,color:'#FF9A3C'}}>{m.name}</span>
+                    <span style={{fontSize:11,color:'#4a5070',marginLeft:'auto'}}>Current kitchen assigner</span>
+                  </div>
+                ) : null
+              })()}
+              <select key={`ka-${settings?.kitchen_assigner_id}`} defaultValue={settings?.kitchen_assigner_id||''}
+                onChange={async e=>{
+                  await updateSettings({kitchen_assigner_id: e.target.value||null})
+                  toast(e.target.value?'Kitchen Assigner assigned ✅':'Kitchen Assigner removed','warn'); load()
+                }}
+                style={{...inp,padding:'10px 13px',width:'100%'}}>
+                <option value="">— None (admin only) —</option>
+                {members.filter(m=>m.status==='approved'&&!m.is_admin).map(m=>(
+                  <option key={m.id} value={m.id}>{m.avatar} {m.name}{m.username?` (@${m.username})`:''}</option>
+                ))}
+              </select>
             </div>
 
           </div>
         </div>
       )}
 
-      {/* ── MEMBERS ── */}
+      {/* ── MEMBERS ── */
       {tab==='members' && (
         <div>
           {/* Summary strip */}
