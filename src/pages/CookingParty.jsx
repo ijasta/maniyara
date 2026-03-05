@@ -680,7 +680,7 @@ function CookingPartyContent() {
                     {new Date(party.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
                   </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
+                <div style={{textAlign:'right',flexShrink:0,paddingRight:isAdmin?70:0}}>
                   <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#FF9A3C'}}>{fmt(totalCost)}</div>
                   <div style={{fontSize:10,color:'#556080',marginTop:2}}>{partyMems} members · {fmt(splitAmt)} each</div>
                 </div>
