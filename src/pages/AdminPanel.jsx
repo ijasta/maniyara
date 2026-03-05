@@ -889,6 +889,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
     page_mytask:         settings?.page_mytask         ?? true,
     page_expenses:       settings?.page_expenses       ?? true,
     page_fund:           settings?.page_fund           ?? true,
+    page_cooking:        settings?.page_cooking        ?? true,
   })
   const [saving, setSaving] = useState(false)
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
@@ -903,6 +904,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
     { key:'page_mytask',    label:'✦ My Task',      desc:'Personal task & proof upload' },
     { key:'page_expenses',  label:'💸 Expenses',    desc:'Split bill tracker' },
     { key:'page_fund',      label:'🏦 Common Fund', desc:'Shared house fund page' },
+    { key:'page_cooking',   label:'🍳 Kitchen',     desc:'Cooking party item tracker' },
   ]
   return (
     <div>
@@ -941,8 +943,8 @@ function SiteControlsTab({ settings, toast, onDone }) {
         })}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:18}}>
-        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:true,page_expenses:true,page_fund:true}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',background:'rgba(125,249,170,.07)',color:'#7DF9AA'}}>✅ Enable All</button>
-        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:false,page_expenses:false,page_fund:false}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B'}}>🚫 Home Only</button>
+        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:true,page_expenses:true,page_fund:true,page_cooking:true}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',background:'rgba(125,249,170,.07)',color:'#7DF9AA'}}>✅ Enable All</button>
+        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:false,page_expenses:false,page_fund:false,page_cooking:false}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B'}}>🚫 Home Only</button>
       </div>
       <button onClick={save} disabled={saving} style={{width:'100%',padding:16,borderRadius:12,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:15,cursor:'pointer',border:'none',background:saving?'#1a2030':'linear-gradient(135deg,#7DF9AA,#00D4AA)',color:'#070810',letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(125,249,170,.25)',opacity:saving?0.6:1}}>
         {saving?'⏳ Saving...':'💾 Save Site Controls'}
