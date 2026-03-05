@@ -43,7 +43,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
     ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',    short:'Home',   end:true }] : []),
     ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task', short:'Task'   }] : []),
     ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses',short:'Money'  }] : []),
-    ....(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
+    ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
     ...(showCooking  ? [{ to:'/cooking',  icon:'🍳', label:'Kitchen', short:'Cook'   }] : []),
     ...(isTaskAssigner && !profile?.is_admin ? [{ to:'/assign', icon:'📋', label:'Assign', short:'Assign' }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
