@@ -249,10 +249,10 @@ export async function rotateToNextWeek() {
 
   const memberIds = members.map(m => m.id)
 
-  // Rotate: member[i] gets task of member[i+1] (task moves DOWN the list)
-  // Last member gets task of first member
+  // Rotate: member[i] gets task of member[i-1] (last member's task goes to first)
+  // Person 1 gets last person's task, Person 2 gets Person 1's task, etc.
   const rows = memberIds.map((memberId, i) => {
-    const fromMemberId = memberIds[(i + 1) % memberIds.length]
+    const fromMemberId = memberIds[(i - 1 + memberIds.length) % memberIds.length]
     return {
       member_id:   memberId,
       task_id:     taskMap[fromMemberId],
