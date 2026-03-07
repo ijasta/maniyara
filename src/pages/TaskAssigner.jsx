@@ -74,7 +74,7 @@ function TaskAssignerContent() {
   const allAssigned = members.every(m => taskMap[m.id])
 
   const rotationPreview = members.map((m, i) => {
-    const fromM    = members[(i - 1 + members.length) % members.length]
+    const fromM    = members[(i + 1) % members.length]
     const nextTask = tasks.find(t => t.id == taskMap[fromM?.id])
     return { member: m, task: nextTask }
   })
@@ -148,7 +148,7 @@ function TaskAssignerContent() {
       <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
         <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
         <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
-          Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>above them</strong>. First person gets the <strong style={{color:'#E8F0FF'}}>last person's task</strong>. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
+          Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>below them</strong>. Last person gets the <strong style={{color:'#E8F0FF'}}>first person's task</strong>. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
         </div>
 
         {/* Rotation preview */}
