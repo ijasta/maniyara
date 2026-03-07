@@ -764,7 +764,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
   }
 
   const rotationPreview = approved.map((m,i) => {
-    const fromM = approved[(i+1)%approved.length]
+    const fromM = approved[(i-1+approved.length)%approved.length]
     return { member:m, task:tasks.find(t=>t.id==taskMap[fromM?.id]) }
   })
 
@@ -787,7 +787,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
       <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
         <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
         <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
-          Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>below them</strong>. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
+          Last member's task goes to the <strong style={{color:'#E8F0FF'}}>first member</strong>. Everyone else gets the task above. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
         </div>
         {allAssigned&&(
           <div style={{background:'#0d0e1a',borderRadius:9,padding:12,marginBottom:12}}>
