@@ -20,6 +20,7 @@ function TaskAssignerContent() {
   const [loading,  setL]        = useState(true)
   const [taskMap,  setTaskMap]  = useState({})
   const [saving,   setSaving]   = useState(false)
+  const [autoSaving, setAutoSaving] = useState(null) // member id being auto-saved
   const [rotating, setRotating] = useState(false)
 
   useEffect(() => { load() }, [user])
@@ -33,8 +34,6 @@ function TaskAssignerContent() {
       const approved = mem.filter(m => m.status === 'approved')
       setMembers(approved); setTasks(tk); setAssigns(a)
       setSettings(st); setWeek(w); setRole(r)
-
-      // Build task map from current assignments
       const map = {}
       a.forEach(x => { map[x.member_id || x.members?.id] = x.task_id || x.tasks?.id })
       setTaskMap(map)
@@ -42,16 +41,20 @@ function TaskAssignerContent() {
     finally { setL(false) }
   }
 
-  const canAccess = profile?.is_admin || role?.isAssigner
-  const activeTasks = tasks.filter(t => t.active)
-  const allAssigned = members.every(m => taskMap[m.id])
+  // Auto-save single member task immediately on select
+  const autoSaveTask = async (memberId, taskId) => {
+    setTaskMap(p => ({ ...p, [memberId]: taskId }))
+    if (!taskId) return
+    setAutoSaving(memberId)
+    try {
+      await adminAssignTasks([{ member_id: memberId, task_id: taskId }])
+      const { assignments: a } = await getCurrentAssignments()
+      setAssigns(a)
+    } catch(e) { toast('Auto-save failed: '+e.message,'error') }
+    finally { setAutoSaving(null) }
+  }
 
-  const rotationPreview = members.map((m, i) => {
-    const nextM    = members[(i + 1) % members.length]
-    const nextTask = tasks.find(t => t.id == taskMap[nextM?.id])
-    return { member: m, task: nextTask }
-  })
-
+  // Save all at once (fallback)
   const saveAssignments = async () => {
     const unassigned = members.filter(m => !taskMap[m.id])
     if (unassigned.length > 0) {
@@ -61,14 +64,24 @@ function TaskAssignerContent() {
     try {
       const rows = members.map(m => ({ member_id: m.id, task_id: taskMap[m.id] }))
       await adminAssignTasks(rows)
-      toast(`Week ${week} tasks saved ✅`); load()
+      toast(`✅ All Week ${week} tasks saved!`); load()
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setSaving(false) }
   }
 
+  const canAccess = profile?.is_admin || role?.isAssigner
+  const activeTasks = tasks.filter(t => t.active)
+  const allAssigned = members.every(m => taskMap[m.id])
+
+  const rotationPreview = members.map((m, i) => {
+    const fromM    = members[(i - 1 + members.length) % members.length]
+    const nextTask = tasks.find(t => t.id == taskMap[fromM?.id])
+    return { member: m, task: nextTask }
+  })
+
   const doRotate = async () => {
     if (!allAssigned) { toast('Assign all tasks first before rotating','warn'); return }
-    if (!confirm(`Rotate to Week ${week+1}?\n\nEach member gets the task of the person below them. Last person gets first person's task.`)) return
+    if (!confirm(`Rotate to Week ${week+1}?\n\nEach member gets the task of the person below them.`)) return
     setRotating(true)
     try {
       const newWeek = await rotateToNextWeek()
@@ -77,7 +90,12 @@ function TaskAssignerContent() {
     finally { setRotating(false) }
   }
 
-  if (loading) return <div style={{color:'#8890b0',padding:60,textAlign:'center'}}>Loading...</div>
+  if (loading) return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:80,gap:14}}>
+      <div style={{width:40,height:40,borderRadius:'50%',border:'3px solid rgba(125,249,170,.15)',borderTopColor:'#7DF9AA',animation:'spin 1s linear infinite'}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
 
   if (!canAccess) return (
     <div style={{padding:40,textAlign:'center'}}>
@@ -100,7 +118,7 @@ function TaskAssignerContent() {
         </div>
       </div>
 
-      {/* Role badge for non-admin assigner */}
+      {/* Role badge */}
       {!profile?.is_admin && role?.isAssigner && (
         <div style={{background:'rgba(125,249,170,.07)',border:'1px solid rgba(125,249,170,.2)',borderRadius:11,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:24}}>🎖️</span>
@@ -126,13 +144,54 @@ function TaskAssignerContent() {
         </div>
       </div>
 
+      {/* ── ROTATE SECTION (TOP) ── */}
+      <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
+        <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
+        <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
+          Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>above them</strong>. First person gets the <strong style={{color:'#E8F0FF'}}>last person's task</strong>. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
+        </div>
+
+        {/* Rotation preview */}
+        {allAssigned && (
+          <div style={{background:'#0d0e1a',borderRadius:9,padding:12,marginBottom:12}}>
+            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Preview — Week {week+1}:</div>
+            {rotationPreview.map(({member:m, task:t})=>(
+              <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',borderBottom:'1px solid rgba(125,249,170,.05)'}}>
+                <Avatar emoji={m.avatar} color={m.color} size={22}/>
+                <span style={{fontWeight:700,fontSize:12,flex:1}}>{m.name}</span>
+                <span style={{fontSize:12,color:'#4a5070',marginRight:4}}>→</span>
+                <span style={{fontSize:12,color:'#8890b0'}}>{t?`${t.emoji} ${t.name}`:'—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={doRotate} disabled={rotating || !allAssigned}
+          style={{width:'100%',padding:13,borderRadius:11,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:14,cursor:allAssigned?'pointer':'not-allowed',border:'none',
+            background:rotating?'#1a2030':allAssigned?'linear-gradient(135deg,#FFD93D,#FF9A3C)':'rgba(255,255,255,.05)',
+            color:allAssigned?'#070810':'#4a5070',letterSpacing:'.06em',opacity:rotating?0.6:1,
+            boxShadow:allAssigned?'0 4px 18px rgba(255,217,61,.2)':'none'}}>
+          {rotating ? '⏳ Rotating...' : `🔄 ROTATE → WEEK ${week+1}`}
+        </button>
+        {!allAssigned && (
+          <div style={{fontSize:11,color:'#FFD93D',textAlign:'center',marginTop:7}}>⚠️ Assign all members a task first to enable rotate</div>
+        )}
+      </div>
+
       {/* ── ASSIGN DROPDOWNS ── */}
       <SecHead title="Assign Tasks to Each Member"/>
+      <div style={{fontSize:11,color:'#6a7090',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
+        <span style={{width:8,height:8,borderRadius:'50%',background:'#7DF9AA',display:'inline-block',animation:'pulse 2s ease-in-out infinite'}}/>
+        Tasks auto-save when you select them
+        <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
+      </div>
+
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
         {members.length === 0 ? (
           <div style={{textAlign:'center',padding:30,color:'#4a5070'}}>No approved members yet.</div>
         ) : members.map((m, i) => {
           const curAssign = assigns.find(a => a.member_id === m.id || a.members?.id === m.id)
+          const isSaving  = autoSaving === m.id
           return (
             <div key={m.id} style={{marginBottom:12,paddingBottom:12,borderBottom:i<members.length-1?'1px solid rgba(125,249,170,.06)':'none'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
@@ -141,20 +200,33 @@ function TaskAssignerContent() {
                   <div style={{fontWeight:700,fontSize:14}}>{m.name}</div>
                   {m.username && <div style={{fontSize:11,color:'#4a5070'}}>@{m.username}</div>}
                 </div>
-                {curAssign && (
+                {/* Status badge */}
+                {isSaving ? (
+                  <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(77,150,255,.1)',border:'1px solid rgba(77,150,255,.25)',color:'#4D96FF'}}>
+                    💾 Saving...
+                  </div>
+                ) : curAssign ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
                     background:curAssign.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',
                     border:`1px solid ${curAssign.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,
                     color:curAssign.done?'#7DF9AA':'#FFD93D'}}>
                     {curAssign.done ? '✅ Done' : '⏳ Pending'}
                   </div>
-                )}
+                ) : taskMap[m.id] ? (
+                  <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(125,249,170,.06)',border:'1px solid rgba(125,249,170,.15)',color:'#7DF9AA'}}>
+                    ✓ Assigned
+                  </div>
+                ) : null}
               </div>
 
               <div style={{display:'flex',gap:9,alignItems:'center'}}>
-                <select value={taskMap[m.id] || ''} onChange={e=>setTaskMap(p=>({...p,[m.id]:e.target.value}))}
+                <select
+                  value={taskMap[m.id] || ''}
+                  onChange={e => autoSaveTask(m.id, e.target.value)}
+                  disabled={isSaving}
                   style={{...inp,flex:1,padding:'10px 13px',
-                    borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
+                    borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)',
+                    opacity:isSaving?0.6:1}}>
                   <option value="">— Pick a task —</option>
                   {activeTasks.map(t=>(
                     <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>
@@ -175,52 +247,13 @@ function TaskAssignerContent() {
           )
         })}
 
+        {/* Save All button — fallback */}
         <button onClick={saveAssignments} disabled={saving}
-          style={{width:'100%',padding:14,borderRadius:11,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:15,cursor:'pointer',border:'none',marginTop:4,
-            background:saving?'#1a2030':'linear-gradient(135deg,#7DF9AA,#00D4AA)',
-            color:'#070810',opacity:saving?0.6:1,letterSpacing:'.06em',
-            boxShadow:'0 4px 18px rgba(125,249,170,.25)'}}>
-          {saving ? '⏳ Saving...' : `💾 Save Assignments — Week ${week}`}
+          style={{width:'100%',padding:13,borderRadius:11,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:14,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',marginTop:4,
+            background:saving?'#1a2030':'rgba(125,249,170,.08)',
+            color:'#7DF9AA',opacity:saving?0.6:1,letterSpacing:'.06em'}}>
+          {saving ? '⏳ Saving All...' : `💾 Save All — Week ${week}`}
         </button>
-      </div>
-
-      {/* ── ROTATE BUTTON ── */}
-      <div style={{background:'rgba(125,249,170,.05)',border:'2px solid rgba(125,249,170,.2)',borderRadius:13,padding:16,marginBottom:16}}>
-        <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:8}}>🔄 ROTATE TO NEXT WEEK</div>
-        <div style={{fontSize:13,color:'#8890b0',lineHeight:1.7,marginBottom:14}}>
-          Each person gets the task of the person <strong style={{color:'#E8F0FF'}}>below them</strong>.<br/>
-          Last person gets the <strong style={{color:'#E8F0FF'}}>first person's task</strong>.<br/>
-          Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong> automatically.
-        </div>
-
-        {/* Preview */}
-        {allAssigned && (
-          <div style={{background:'#0d0e1a',borderRadius:9,padding:12,marginBottom:14}}>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>
-              Preview — Week {week+1}:
-            </div>
-            {rotationPreview.map(({member:m, task:t})=>(
-              <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid rgba(125,249,170,.05)'}}>
-                <Avatar emoji={m.avatar} color={m.color} size={22}/>
-                <span style={{fontWeight:700,fontSize:12,flex:1}}>{m.name}</span>
-                <span style={{fontSize:12,color:'#4a5070',marginRight:4}}>←</span>
-                <span style={{fontSize:12,color:'#8890b0'}}>{t?`${t.emoji} ${t.name}`:'—'}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button onClick={doRotate} disabled={rotating || !allAssigned}
-          style={{width:'100%',padding:14,borderRadius:11,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:15,cursor:allAssigned?'pointer':'not-allowed',border:'none',
-            background:rotating?'#1a2030':allAssigned?'linear-gradient(135deg,#FFD93D,#FF9A3C)':'rgba(255,255,255,.05)',
-            color:allAssigned?'#070810':'#4a5070',letterSpacing:'.06em',
-            opacity:rotating?0.6:1,transition:'all .15s',
-            boxShadow:allAssigned?'0 4px 18px rgba(255,217,61,.25)':'none'}}>
-          {rotating ? '⏳ Rotating...' : `🔄 ROTATE → WEEK ${week+1}`}
-        </button>
-        {!allAssigned && (
-          <div style={{fontSize:11,color:'#FFD93D',textAlign:'center',marginTop:8}}>⚠️ Assign all members a task first</div>
-        )}
       </div>
 
       {/* ── CLEAR OPTIONS ── */}
