@@ -242,10 +242,10 @@ export async function rotateToNextWeek() {
 
   const memberIds = members.map(m => m.id)
 
-  // Rotate UP: member[i] gets task of member[i+1]
-  // Last member gets task of first member
+  // Rotate DOWN: member[i] gets task of member[i-1]
+  // First member gets task of last member
   const rows = memberIds.map((memberId, i) => {
-    const fromMemberId = memberIds[(i + 1) % memberIds.length]
+    const fromMemberId = memberIds[(i - 1 + memberIds.length) % memberIds.length]
     return {
       member_id:   memberId,
       task_id:     taskMap[fromMemberId],
@@ -266,7 +266,7 @@ export async function rotateToNextWeek() {
   await supabase.from('logs').insert({
     action: `Rotated to Week ${newWeek}`,
     actor: 'Admin',
-    details: `${rows.length} tasks rotated UP`
+    details: `${rows.length} tasks rotated DOWN`
   })
 
   return newWeek
