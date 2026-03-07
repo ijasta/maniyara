@@ -191,22 +191,29 @@ export async function adminAssignTasks(assigns) {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
   const week = s?.current_week || 1
 
-  // Delete existing assignments for this week first (re-assign)
-  await supabase.from('assignments').delete().eq('week_number', week)
+  // Upsert each member individually so other members' tasks are never deleted
+  for (const a of assigns) {
+    const { data: existing } = await supabase
+      .from('assignments')
+      .select('id')
+      .eq('member_id', a.member_id)
+      .eq('week_number', week)
+      .maybeSingle()
 
-  const rows = assigns.map(a => ({
-    member_id:   a.member_id,
-    task_id:     a.task_id,
-    week_number: week,
-    done:        false,
-  }))
-  const { error } = await supabase.from('assignments').insert(rows)
-  if (error) throw error
+    if (existing) {
+      await supabase.from('assignments')
+        .update({ task_id: a.task_id })
+        .eq('id', existing.id)
+    } else {
+      await supabase.from('assignments')
+        .insert({ member_id: a.member_id, task_id: a.task_id, week_number: week, done: false })
+    }
+  }
 
   await supabase.from('logs').insert({
     action: `Tasks assigned for Week ${week}`,
     actor: 'Admin',
-    details: `${rows.length} members assigned`
+    details: `${assigns.length} members assigned`
   })
   return week
 }
@@ -242,10 +249,10 @@ export async function rotateToNextWeek() {
 
   const memberIds = members.map(m => m.id)
 
-  // Rotate DOWN: member[i] gets task of member[i-1]
-  // First member gets task of last member
+  // Rotate: member[i] gets task of member[i+1] (task moves DOWN the list)
+  // Last member gets task of first member
   const rows = memberIds.map((memberId, i) => {
-    const fromMemberId = memberIds[(i - 1 + memberIds.length) % memberIds.length]
+    const fromMemberId = memberIds[(i + 1) % memberIds.length]
     return {
       member_id:   memberId,
       task_id:     taskMap[fromMemberId],
@@ -266,7 +273,7 @@ export async function rotateToNextWeek() {
   await supabase.from('logs').insert({
     action: `Rotated to Week ${newWeek}`,
     actor: 'Admin',
-    details: `${rows.length} tasks rotated DOWN`
+    details: `${rows.length} tasks rotated (top to bottom)`
   })
 
   return newWeek
