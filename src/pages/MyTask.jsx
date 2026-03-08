@@ -31,7 +31,8 @@ function MyTaskContent() {
   const [proof,      setProof] = useState(null)
   const [photoModal, setPhotoModal] = useState(null) // URL to show in modal
   const [viewLoading,setVL]    = useState(false)
-  const fileRef = useRef()
+  const fileRef    = useRef()
+  const galleryRef  = useRef()
 
   useEffect(() => { load() }, [user])
 
@@ -218,8 +219,8 @@ function MyTaskContent() {
             )}
           </div>
 
-          {/* Upload proof section — only if not done */}
-          {!assignment.done && (
+          {/* Upload proof section */}
+          {!assignment.done ? (
             <>
               <SecHead title="Mark as Done"/>
               <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:12}}>
@@ -227,27 +228,106 @@ function MyTaskContent() {
                   Upload a photo proof of your completed task, then tap Submit.
                 </div>
 
-                <div onClick={()=>fileRef.current.click()}
-                  style={{border:'2px dashed rgba(125,249,170,.2)',borderRadius:11,padding:'22px 14px',textAlign:'center',cursor:'pointer',marginBottom:12,transition:'border-color .15s'}}
-                  onTouchStart={e=>e.currentTarget.style.borderColor='#7DF9AA'}
-                  onTouchEnd={e=>e.currentTarget.style.borderColor='rgba(125,249,170,.2)'}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor='#7DF9AA'}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(125,249,170,.2)'}>
-                  <span style={{fontSize:32,display:'block',marginBottom:7}}>📸</span>
-                  <div style={{fontWeight:700,fontSize:14,marginBottom:3}}>Tap to take / upload photo</div>
-                  <div style={{fontSize:12,color:'#4a5070'}}>JPG · PNG · Max 50MB</div>
+                <div style={{display:'flex',gap:9,marginBottom:12}}>
+                  {/* Camera button */}
+                  <button onClick={()=>fileRef.current.click()}
+                    style={{flex:1,padding:'16px 10px',borderRadius:13,border:'1px solid rgba(125,249,170,.25)',background:'rgba(125,249,170,.06)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'all .15s'}}
+                    onTouchStart={e=>e.currentTarget.style.background='rgba(125,249,170,.12)'}
+                    onTouchEnd={e=>e.currentTarget.style.background='rgba(125,249,170,.06)'}>
+                    <span style={{fontSize:28}}>📷</span>
+                    <span style={{fontSize:12,fontWeight:700,color:'#7DF9AA'}}>Take Photo</span>
+                    <span style={{fontSize:10,color:'#4a5070'}}>Camera</span>
+                  </button>
+                  {/* Gallery button */}
+                  <button onClick={()=>galleryRef.current.click()}
+                    style={{flex:1,padding:'16px 10px',borderRadius:13,border:'1px solid rgba(77,150,255,.25)',background:'rgba(77,150,255,.06)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'all .15s'}}
+                    onTouchStart={e=>e.currentTarget.style.background='rgba(77,150,255,.12)'}
+                    onTouchEnd={e=>e.currentTarget.style.background='rgba(77,150,255,.06)'}>
+                    <span style={{fontSize:28}}>🖼️</span>
+                    <span style={{fontSize:12,fontWeight:700,color:'#4D96FF'}}>Choose File</span>
+                    <span style={{fontSize:10,color:'#4a5070'}}>Gallery</span>
+                  </button>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleFile}/>
+                <input ref={fileRef}   type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleFile}/>
+                <input ref={galleryRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
 
                 {proof && (
                   <div style={{marginBottom:12}}>
                     <img src={proof.url} alt="preview" style={{width:'100%',borderRadius:9,border:'1px solid rgba(125,249,170,.2)',maxHeight:200,objectFit:'cover'}}/>
-                    <div style={{fontSize:12,color:'#7DF9AA',marginTop:6,fontWeight:700}}>✅ Ready — {proof.file.name}</div>
+                    <div style={{fontSize:12,color:'#7DF9AA',marginTop:6,fontWeight:700}}>Ready — {proof.file.name}</div>
                   </div>
                 )}
 
                 <Btn full loading={submitting} onClick={handleSubmit} style={{padding:14,fontSize:15}}>
-                  ⚡ SUBMIT & MARK DONE
+                  SUBMIT & MARK DONE
+                </Btn>
+              </div>
+            </>
+          ) : (
+            <>
+              <SecHead title="Upload Proof Photo"/>
+              <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:12}}>
+                <div style={{fontSize:13,color:'#8890b0',marginBottom:14,lineHeight:1.6}}>
+                  {assignment.proof_url ? 'Replace your proof photo if needed.' : 'Upload a photo proof of your completed task.'}
+                </div>
+
+                <div style={{display:'flex',gap:9,marginBottom:12}}>
+                  {/* Camera button */}
+                  <button onClick={()=>fileRef.current.click()}
+                    style={{flex:1,padding:'16px 10px',borderRadius:13,border:'1px solid rgba(125,249,170,.25)',background:'rgba(125,249,170,.06)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'all .15s'}}
+                    onTouchStart={e=>e.currentTarget.style.background='rgba(125,249,170,.12)'}
+                    onTouchEnd={e=>e.currentTarget.style.background='rgba(125,249,170,.06)'}>
+                    <span style={{fontSize:28}}>📷</span>
+                    <span style={{fontSize:12,fontWeight:700,color:'#7DF9AA'}}>Take Photo</span>
+                    <span style={{fontSize:10,color:'#4a5070'}}>Camera</span>
+                  </button>
+                  {/* Gallery button */}
+                  <button onClick={()=>galleryRef.current.click()}
+                    style={{flex:1,padding:'16px 10px',borderRadius:13,border:'1px solid rgba(77,150,255,.25)',background:'rgba(77,150,255,.06)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:6,transition:'all .15s'}}
+                    onTouchStart={e=>e.currentTarget.style.background='rgba(77,150,255,.12)'}
+                    onTouchEnd={e=>e.currentTarget.style.background='rgba(77,150,255,.06)'}>
+                    <span style={{fontSize:28}}>🖼️</span>
+                    <span style={{fontSize:12,fontWeight:700,color:'#4D96FF'}}>Choose File</span>
+                    <span style={{fontSize:10,color:'#4a5070'}}>Gallery</span>
+                  </button>
+                </div>
+                <input ref={fileRef}   type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleFile}/>
+                <input ref={galleryRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
+
+                {proof && (
+                  <div style={{marginBottom:12}}>
+                    <img src={proof.url} alt="preview" style={{width:'100%',borderRadius:9,border:'1px solid rgba(125,249,170,.2)',maxHeight:200,objectFit:'cover'}}/>
+                    <div style={{fontSize:12,color:'#7DF9AA',marginTop:6,fontWeight:700}}>Ready — {proof.file.name}</div>
+                  </div>
+                )}
+
+                <Btn full loading={submitting} onClick={async()=>{
+                  if (!proof) { toast('Select a photo first','warn'); return }
+                  setSub(true)
+                  try {
+                    const compressed = await compressImage(proof.file)
+                    const path = `${user.id}/${Date.now()}.jpg`
+                    const proxyBase = import.meta.env.VITE_SUPABASE_PROXY_URL || import.meta.env.VITE_SUPABASE_URL
+                    const uploadUrl = `${proxyBase}/storage/v1/object/task-proofs/${path}`
+                    const res = await fetch(uploadUrl, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                        'Content-Type': 'image/jpeg',
+                        'x-upsert': 'true'
+                      },
+                      body: compressed
+                    })
+                    if (res.ok) {
+                      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/task-proofs/${path}`
+                      await supabase.from('assignments').update({ proof_url: publicUrl, proof_path: path }).eq('id', assignment.id)
+                      toast('Photo uploaded!'); setProof(null); load()
+                    } else { toast('Upload failed','error') }
+                  } catch(e) { toast('Failed: '+e.message,'error') }
+                  finally { setSub(false) }
+                }} style={{padding:14,fontSize:15}}>
+                  Upload Photo
                 </Btn>
               </div>
             </>
