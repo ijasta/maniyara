@@ -13,7 +13,6 @@ import CommonFund from './pages/CommonFund'
 import CookingParty from './pages/CookingParty'
 import AdminPanel from './pages/AdminPanel'
 import TaskAssigner from './pages/TaskAssigner'
-import UtilityTracker from './pages/UtilityTracker'
 import MaintenancePage from './pages/MaintenancePage'
 import LoadingScreen from './components/LoadingScreen'
 
@@ -79,7 +78,6 @@ export default function App() {
     expenses:  siteSettings?.page_expenses  !== false,
     fund:      siteSettings?.page_fund      !== false,
     cooking:   siteSettings?.page_cooking   !== false,
-    utility:   siteSettings?.page_utility   !== false,
   }
 
   const isTaskAssigner = user && siteSettings?.task_assigner_id === user.id
@@ -95,7 +93,6 @@ export default function App() {
         <Route path="expenses" element={<PageGuard enabled={pages.expenses}><Expenses /></PageGuard>} />
         <Route path="fund"     element={<PageGuard enabled={pages.fund}><CommonFund /></PageGuard>} />
         <Route path="cooking"  element={<PageGuard enabled={pages.cooking}><CookingParty /></PageGuard>} />
-        <Route path="utility"  element={<PageGuard enabled={pages.utility}><UtilityTracker /></PageGuard>} />
         <Route path="profile"  element={<Profile />} />
         <Route path="assign"   element={<Guard><TaskAssigner /></Guard>} />
         <Route path="admin"    element={<Guard adminOnly><AdminPanel onSettingsChange={()=>getSettings().then(setSiteSettings)}/></Guard>} />
