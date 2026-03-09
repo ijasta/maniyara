@@ -98,15 +98,13 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
   const showExpenses = siteSettings?.page_expenses  !== false
   const showFund     = siteSettings?.page_fund      !== false
   const showCooking  = siteSettings?.page_cooking   !== false
-  const showUtility  = siteSettings?.page_utility   !== false
 
   const links = [
     ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',    short:'Home',   end:true }] : []),
     ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task', short:'Task'   }] : []),
     ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses',short:'Money'  }] : []),
-    ....(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
+    ...(showFund      ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
     ...(showCooking  ? [{ to:'/cooking',  icon:'🍳', label:'Kitchen', short:'Cook'   }] : []),
-    ...(showUtility  ? [{ to:'/utility',  icon:'⚡', label:'Utilities',short:'Bills'  }] : []),
     ...(isTaskAssigner && !profile?.is_admin ? [{ to:'/assign', icon:'📋', label:'Assign', short:'Assign' }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
     { to:'/profile', icon:'👤', label:'Profile', short:'Me' },
