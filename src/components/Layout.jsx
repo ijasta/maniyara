@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { signOut } from '../lib/supabase'
+import { signOut, getCurrentAssignments } from '../lib/supabase'
 import { useEffect, useState } from 'react'
 
 function getWeek() {
@@ -26,6 +26,66 @@ function useCountdown() {
   return cd
 }
 
+
+// ── TASK REMINDER BANNER ─────────────────────────────────
+function TaskReminderBanner({ profile }) {
+  const [show, setShow]       = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    if (!profile?.id || dismissed) return
+    getCurrentAssignments().then(({ assignments }) => {
+      const mine = assignments.find(a =>
+        (a.member_id === profile.id || a.members?.id === profile.id)
+      )
+      // Show banner if assigned but not done
+      if (mine && !mine.done) setShow(true)
+      else setShow(false)
+    }).catch(() => {})
+  }, [profile?.id, dismissed])
+
+  if (!show || dismissed) return null
+
+  return (
+    <div style={{
+      position:'relative', margin:'0 0 12px 0',
+      background:'linear-gradient(135deg,rgba(255,217,61,.08),rgba(255,154,60,.06))',
+      border:'1px solid rgba(255,217,61,.25)',
+      borderRadius:14, padding:'12px 14px',
+      display:'flex', alignItems:'center', gap:12,
+      animation:'bannerIn .35s cubic-bezier(.34,1.2,.64,1)'
+    }}>
+      {/* Glow */}
+      <div style={{position:'absolute',inset:0,borderRadius:14,background:'linear-gradient(135deg,rgba(255,217,61,.04),transparent)',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',top:0,left:'5%',right:'5%',height:1,background:'linear-gradient(90deg,transparent,rgba(255,217,61,.4),transparent)',borderRadius:99}}/>
+
+      {/* Icon pulsing */}
+      <div style={{width:40,height:40,borderRadius:12,background:'rgba(255,217,61,.1)',border:'1px solid rgba(255,217,61,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0,animation:'pulse 2s ease-in-out infinite'}}>
+        ⏰
+      </div>
+
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:'Orbitron,monospace',fontSize:11,fontWeight:800,color:'#FFD93D',letterSpacing:'.08em',marginBottom:3}}>
+          TASK PENDING
+        </div>
+        <div style={{fontSize:12,color:'#c0a830',lineHeight:1.4}}>
+          You haven't completed your task this week. Go to <strong style={{color:'#FFD93D'}}>My Task</strong> to mark it done.
+        </div>
+      </div>
+
+      {/* Dismiss */}
+      <button onClick={()=>setDismissed(true)}
+        style={{width:28,height:28,borderRadius:8,border:'1px solid rgba(255,217,61,.2)',background:'rgba(255,217,61,.06)',color:'#FFD93D',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+        ✕
+      </button>
+      <style>{`
+        @keyframes bannerIn { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:none } }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+      `}</style>
+    </div>
+  )
+}
+
 export default function Layout({ siteSettings, isTaskAssigner }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -38,13 +98,15 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
   const showExpenses = siteSettings?.page_expenses  !== false
   const showFund     = siteSettings?.page_fund      !== false
   const showCooking  = siteSettings?.page_cooking   !== false
+  const showUtility  = siteSettings?.page_utility   !== false
 
   const links = [
     ...(showDash     ? [{ to:'/',         icon:'⌂',  label:'Home',    short:'Home',   end:true }] : []),
     ...(showTask     ? [{ to:'/mytask',   icon:'✦',  label:'My Task', short:'Task'   }] : []),
     ...(showExpenses ? [{ to:'/expenses', icon:'💸', label:'Expenses',short:'Money'  }] : []),
-    ...(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
+    ....(showFund     ? [{ to:'/fund',     icon:'🏦', label:'Fund',    short:'Fund'   }] : []),
     ...(showCooking  ? [{ to:'/cooking',  icon:'🍳', label:'Kitchen', short:'Cook'   }] : []),
+    ...(showUtility  ? [{ to:'/utility',  icon:'⚡', label:'Utilities',short:'Bills'  }] : []),
     ...(isTaskAssigner && !profile?.is_admin ? [{ to:'/assign', icon:'📋', label:'Assign', short:'Assign' }] : []),
     ...(profile?.is_admin ? [{ to:'/admin', icon:'⚙', label:'Admin', short:'Admin' }] : []),
     { to:'/profile', icon:'👤', label:'Profile', short:'Me' },
