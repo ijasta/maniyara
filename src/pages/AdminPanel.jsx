@@ -915,6 +915,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
     page_expenses:       settings?.page_expenses       ?? true,
     page_fund:           settings?.page_fund           ?? true,
     page_cooking:        settings?.page_cooking        ?? true,
+    page_utility:        settings?.page_utility        ?? true,
   })
   const [saving, setSaving] = useState(false)
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
@@ -930,6 +931,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
     { key:'page_expenses',  label:'💸 Expenses',    desc:'Split bill tracker' },
     { key:'page_fund',      label:'🏦 Common Fund', desc:'Shared house fund page' },
     { key:'page_cooking',   label:'🍳 Kitchen',     desc:'Cooking party item tracker' },
+    { key:'page_utility',   label:'⚡ Utilities',   desc:'Electricity, internet & gas bills' },
   ]
   return (
     <div>
@@ -968,8 +970,8 @@ function SiteControlsTab({ settings, toast, onDone }) {
         })}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:18}}>
-        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:true,page_expenses:true,page_fund:true,page_cooking:true}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',background:'rgba(125,249,170,.07)',color:'#7DF9AA'}}>✅ Enable All</button>
-        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:false,page_expenses:false,page_fund:false,page_cooking:false}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B'}}>🚫 Home Only</button>
+        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:true,page_expenses:true,page_fund:true,page_cooking:true,page_utility:true}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',background:'rgba(125,249,170,.07)',color:'#7DF9AA'}}>✅ Enable All</button>
+        <button onClick={()=>setForm(f=>({...f,page_dashboard:true,page_mytask:false,page_expenses:false,page_fund:false,page_cooking:false,page_utility:false}))} style={{padding:'10px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:12,cursor:'pointer',border:'1px solid rgba(255,107,107,.2)',background:'rgba(255,107,107,.07)',color:'#FF6B6B'}}>🚫 Home Only</button>
       </div>
       <button onClick={save} disabled={saving} style={{width:'100%',padding:16,borderRadius:12,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:15,cursor:'pointer',border:'none',background:saving?'#1a2030':'linear-gradient(135deg,#7DF9AA,#00D4AA)',color:'#070810',letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(125,249,170,.25)',opacity:saving?0.6:1}}>
         {saving?'⏳ Saving...':'💾 Save Site Controls'}
@@ -1104,6 +1106,22 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
           <input type="text" defaultValue={settings?.house_name||''} placeholder="e.g. Maniyara"
             onBlur={async e=>{if(e.target.value!==(settings?.house_name||''))await save({house_name:e.target.value})}}
             style={{...inp,padding:'10px 13px'}}/>
+        </div>
+        <div style={{borderTop:'1px solid rgba(255,255,255,.05)',paddingTop:12,display:'flex',alignItems:'center',gap:12}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',marginBottom:2}}>🕵️ Reveal Complaint Senders</div>
+            <div style={{fontSize:11,color:'#6a7090',lineHeight:1.5}}>When ON, you see who posted each complaint. Members always see Anonymous.</div>
+          </div>
+          <div onClick={async()=>{try{await save({complaints_reveal_identity:!(settings?.complaints_reveal_identity)})}catch(_){}}}
+            style={{width:52,height:28,borderRadius:99,cursor:'pointer',position:'relative',flexShrink:0,transition:'background .2s',
+              background:settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.08)',
+              border:`2px solid ${settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.12)'}`,
+              boxShadow:settings?.complaints_reveal_identity?'0 0 14px rgba(192,132,252,.35)':'none'}}>
+            <div style={{position:'absolute',top:2,transition:'left .2s',
+              left:settings?.complaints_reveal_identity?24:2,
+              width:20,height:20,borderRadius:'50%',
+              background:settings?.complaints_reveal_identity?'#fff':'rgba(255,255,255,.35)'}}/>
+          </div>
         </div>
       </div>
       <SecHead title="📅 Week Control"/>
