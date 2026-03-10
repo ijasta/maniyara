@@ -132,7 +132,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       </div>
 
       {/* ── DESKTOP SIDEBAR + MAIN ── */}
-      <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1,marginTop:54}}>
+      <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1}}>
         <aside className="sidebar" style={{width:236,flexShrink:0,position:'sticky',top:54,height:'calc(100vh - 54px)',overflowY:'auto',background:'rgba(9,10,20,.98)',borderRight:'1px solid rgba(125,249,170,.09)',padding:'18px 12px',display:'flex',flexDirection:'column',gap:3,boxShadow:'3px 0 28px rgba(0,0,0,.5)'}}>
           <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#7DF9AA,#FF6B9D,transparent)'}}/>
 
@@ -275,13 +275,13 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .mob-bar  { display:none !important; }
           .mob-nav  { display:none !important; }
           .sidebar  { display:flex !important; }
-          .main-wrap{ padding:32px 40px; }
+          .main-wrap{ padding:32px 40px; margin-top:0; }
         }
         @media (max-width:767px) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; position:fixed !important; top:0; left:0; right:0; z-index:9999 !important; -webkit-transform:translateZ(0); transform:translateZ(0); }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ padding:66px 12px calc(68px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
+          .main-wrap{ margin-top:54px; padding:12px 12px calc(68px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
