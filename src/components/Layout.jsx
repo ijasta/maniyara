@@ -122,7 +122,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
   return (
     <>
       {/* ── MOBILE TOPBAR ── */}
-      <div style={{display:'flex',position:'fixed',top:0,left:0,right:0,zIndex:300,height:54,padding:'0 14px',alignItems:'center',justifyContent:'space-between',gap:10,background:'rgba(7,8,16,.96)',borderBottom:'1px solid rgba(125,249,170,.09)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)'}}
+      <div style={{display:'flex',position:'fixed',top:0,left:0,right:0,zIndex:9999,height:54,padding:'0 14px',paddingTop:'max(0px, env(safe-area-inset-top))',alignItems:'center',justifyContent:'space-between',gap:10,background:'#070810',borderBottom:'1px solid rgba(125,249,170,.09)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)',transform:'translateZ(0)',WebkitTransform:'translateZ(0)'}}
         className="mob-bar">
         <div style={{fontFamily:'Orbitron,monospace',fontSize:18,fontWeight:900,letterSpacing:2,background:'linear-gradient(135deg,#7DF9AA,#00ffcc)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',filter:'drop-shadow(0 0 8px rgba(125,249,170,.5))'}}>MANIYARA</div>
         <div style={{display:'flex',gap:7,flexShrink:0}}>
@@ -132,7 +132,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       </div>
 
       {/* ── DESKTOP SIDEBAR + MAIN ── */}
-      <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1,marginTop:54}}>
+      <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1,marginTop:'calc(54px + env(safe-area-inset-top, 0px))'}}>
         <aside className="sidebar" style={{width:236,flexShrink:0,position:'sticky',top:54,height:'calc(100vh - 54px)',overflowY:'auto',background:'rgba(9,10,20,.98)',borderRight:'1px solid rgba(125,249,170,.09)',padding:'18px 12px',display:'flex',flexDirection:'column',gap:3,boxShadow:'3px 0 28px rgba(0,0,0,.5)'}}>
           <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#7DF9AA,#FF6B9D,transparent)'}}/>
 
@@ -279,9 +279,9 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
         }
         @media (max-width:767px) {
           .sidebar  { display:none !important; }
-          .mob-bar  { display:flex !important; }
+          .mob-bar  { display:flex !important; position:fixed !important; top:0; left:0; right:0; z-index:9999 !important; -webkit-transform:translateZ(0); transform:translateZ(0); }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ padding:12px 12px calc(68px + env(safe-area-inset-bottom,0)) 12px; overflow-x:hidden; }
+          .main-wrap{ padding:12px 12px calc(68px + env(safe-area-inset-bottom,0px)) 12px; padding-top:calc(54px + env(safe-area-inset-top,0px) + 12px); overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
