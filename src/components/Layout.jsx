@@ -288,7 +288,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ margin-top:calc(54px + env(safe-area-inset-top,0px)); padding:12px 12px calc(120px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
+          .main-wrap{ margin-top:calc(54px + env(safe-area-inset-top,0px)); padding:4px 12px calc(120px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
@@ -305,9 +305,8 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           border:none; background:none; cursor:pointer; line-height:1;
           -webkit-tap-highlight-color:transparent;
         }
-        .mob-active { color:#7DF9AA !important; }
-        .mob-nb { transition: all .15s; }
-        .mob-nb:active { transform: scale(.92); }
+        .page-anim { animation: fadeUp .22s ease; margin-top:0; padding-top:0; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
       `}</style>
     </>
   )
