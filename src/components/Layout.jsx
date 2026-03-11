@@ -122,14 +122,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
   return (
     <>
       {/* ── MOBILE TOPBAR ── */}
-      <div style={{display:'flex',position:'fixed',top:0,left:0,right:0,zIndex:9999,
-        paddingTop:'env(safe-area-inset-top)',
-        height:'calc(54px + env(safe-area-inset-top))',
-        padding:'env(safe-area-inset-top) 14px 0 14px',
-        alignItems:'center',justifyContent:'space-between',gap:10,
-        background:'#070810',
-        borderBottom:'1px solid rgba(125,249,170,.09)',
-        WebkitTransform:'translate3d(0,0,0)',transform:'translate3d(0,0,0)'}}
+      <div style={{display:'flex',position:'sticky',top:0,zIndex:300,height:54,padding:'0 14px',alignItems:'center',justifyContent:'space-between',gap:10,background:'rgba(7,8,16,.96)',borderBottom:'1px solid rgba(125,249,170,.09)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)'}}
         className="mob-bar">
         <div style={{fontFamily:'Orbitron,monospace',fontSize:18,fontWeight:900,letterSpacing:2,background:'linear-gradient(135deg,#7DF9AA,#00ffcc)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',filter:'drop-shadow(0 0 8px rgba(125,249,170,.5))'}}>MANIYARA</div>
         <div style={{display:'flex',gap:7,flexShrink:0}}>
@@ -139,7 +132,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       </div>
 
       {/* ── DESKTOP SIDEBAR + MAIN ── */}
-      <div style={{display:'flex',minHeight:'100vh',position:'relative',zIndex:1}}>
+      <div style={{display:'flex',minHeight:'calc(100vh - 54px)',position:'relative',zIndex:1}}>
         <aside className="sidebar" style={{width:236,flexShrink:0,position:'sticky',top:54,height:'calc(100vh - 54px)',overflowY:'auto',background:'rgba(9,10,20,.98)',borderRight:'1px solid rgba(125,249,170,.09)',padding:'18px 12px',display:'flex',flexDirection:'column',gap:3,boxShadow:'3px 0 28px rgba(0,0,0,.5)'}}>
           <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#7DF9AA,#FF6B9D,transparent)'}}/>
 
@@ -244,8 +237,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           <div className="page-anim" key={typeof window!=='undefined'?window.location.hash:''}>
             <Outlet />
           </div>
-          {/* Bottom spacer — clears fixed nav bar on mobile */}
-          <div className="mob-spacer"/>
         </main>
       </div>
 
@@ -284,16 +275,16 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .mob-bar  { display:none !important; }
           .mob-nav  { display:none !important; }
           .sidebar  { display:flex !important; }
-          .main-wrap{ padding:32px 40px; margin-top:0; }
+          .main-wrap{ padding:32px 40px; }
         }
         @media (max-width:767px) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ margin-top:54px; padding:4px 12px 0 12px; overflow-x:hidden; }
+          .main-wrap{ padding:12px 12px calc(68px + env(safe-area-inset-bottom,0)) 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
-        .main-wrap { flex:1; min-width:0; position:relative; }
+        .main-wrap { flex:1; min-width:0; overflow-y:auto; position:relative; }
         .mob-nav {
           display:none; position:fixed; bottom:0; left:0; right:0; z-index:300;
           background:rgba(7,8,16,.97); border-top:1px solid rgba(125,249,170,.09);
@@ -307,10 +298,9 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           border:none; background:none; cursor:pointer; line-height:1;
           -webkit-tap-highlight-color:transparent;
         }
-        .mob-spacer { display: none; }
-        @media (max-width:767px) {
-          .mob-spacer { display: block; height: calc(72px + env(safe-area-inset-bottom, 0px)); }
-        }
+        .mob-active { color:#7DF9AA !important; }
+        .mob-nb { transition: all .15s; }
+        .mob-nb:active { transform: scale(.92); }
       `}</style>
     </>
   )
