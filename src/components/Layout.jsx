@@ -82,7 +82,7 @@ function TaskReminderBanner({ profile }) {
         @keyframes bannerIn { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:none } }
         @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
       `}</style>
-    </>
+    </div>
   )
 }
 
