@@ -82,7 +82,7 @@ function TaskReminderBanner({ profile }) {
         @keyframes bannerIn { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:none } }
         @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
       `}</style>
-    </div>
+    </>
   )
 }
 
@@ -120,9 +120,16 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
   })
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',background:'#070810'}}>
+    <>
       {/* ── MOBILE TOPBAR ── */}
-      <div style={{display:'flex',position:'fixed',top:0,left:0,right:0,zIndex:9999,height:54,padding:'0 14px',alignItems:'center',justifyContent:'space-between',gap:10,background:'#070810',borderBottom:'1px solid rgba(125,249,170,.09)',WebkitTransform:'translate3d(0,0,0)',transform:'translate3d(0,0,0)',willChange:'transform'}}
+      <div style={{display:'flex',position:'fixed',top:0,left:0,right:0,zIndex:9999,
+        paddingTop:'env(safe-area-inset-top)',
+        height:'calc(54px + env(safe-area-inset-top))',
+        padding:'env(safe-area-inset-top) 14px 0 14px',
+        alignItems:'center',justifyContent:'space-between',gap:10,
+        background:'#070810',
+        borderBottom:'1px solid rgba(125,249,170,.09)',
+        WebkitTransform:'translate3d(0,0,0)',transform:'translate3d(0,0,0)'}}
         className="mob-bar">
         <div style={{fontFamily:'Orbitron,monospace',fontSize:18,fontWeight:900,letterSpacing:2,background:'linear-gradient(135deg,#7DF9AA,#00ffcc)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',filter:'drop-shadow(0 0 8px rgba(125,249,170,.5))'}}>MANIYARA</div>
         <div style={{display:'flex',gap:7,flexShrink:0}}>
@@ -132,7 +139,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       </div>
 
       {/* ── DESKTOP SIDEBAR + MAIN ── */}
-      <div className="layout-wrap" style={{display:'flex',flex:1,position:'relative',zIndex:1,minHeight:0}}>
+      <div style={{display:'flex',minHeight:'100vh',position:'relative',zIndex:1}}>
         <aside className="sidebar" style={{width:236,flexShrink:0,position:'sticky',top:54,height:'calc(100vh - 54px)',overflowY:'auto',background:'rgba(9,10,20,.98)',borderRight:'1px solid rgba(125,249,170,.09)',padding:'18px 12px',display:'flex',flexDirection:'column',gap:3,boxShadow:'3px 0 28px rgba(0,0,0,.5)'}}>
           <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,transparent,#7DF9AA,#FF6B9D,transparent)'}}/>
 
@@ -271,18 +278,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
       </nav>
 
       <style>{`
-        /* iOS PWA full height fix */
-        html, body, #root {
-          height: 100%;
-          height: -webkit-fill-available;
-          overflow: hidden;
-        }
-        .layout-wrap {
-          flex: 1;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior: none;
-        }
         @media (min-width:768px) {
           .mob-bar  { display:none !important; }
           .mob-nav  { display:none !important; }
@@ -293,8 +288,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; }
           .mob-nav  { display:flex !important; }
-          .layout-wrap { padding-top:54px !important; }
-          .main-wrap{ padding:12px 12px calc(68px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
+          .main-wrap{ margin-top:calc(54px + env(safe-area-inset-top)); padding:12px 12px calc(68px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
@@ -315,6 +309,6 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
         .mob-nb { transition: all .15s; }
         .mob-nb:active { transform: scale(.92); }
       `}</style>
-    </div>
+    </>
   )
 }
