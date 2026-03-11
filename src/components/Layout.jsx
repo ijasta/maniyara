@@ -244,6 +244,8 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           <div className="page-anim" key={typeof window!=='undefined'?window.location.hash:''}>
             <Outlet />
           </div>
+          {/* Bottom spacer — clears fixed nav bar on mobile */}
+          <div className="mob-spacer"/>
         </main>
       </div>
 
@@ -288,7 +290,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ margin-top:54px; padding:4px 12px calc(80px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
+          .main-wrap{ margin-top:54px; padding:4px 12px 0 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
@@ -305,8 +307,10 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           border:none; background:none; cursor:pointer; line-height:1;
           -webkit-tap-highlight-color:transparent;
         }
-        .page-anim { animation: fadeUp .22s ease; margin-top:0; padding-top:0; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+        .mob-spacer { display: none; }
+        @media (max-width:767px) {
+          .mob-spacer { display: block; height: calc(72px + env(safe-area-inset-bottom, 0px)); }
+        }
       `}</style>
     </>
   )
