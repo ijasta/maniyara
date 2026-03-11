@@ -288,7 +288,7 @@ export default function Layout({ siteSettings, isTaskAssigner }) {
           .sidebar  { display:none !important; }
           .mob-bar  { display:flex !important; }
           .mob-nav  { display:flex !important; }
-          .main-wrap{ margin-top:54px; padding:4px 12px calc(120px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
+          .main-wrap{ margin-top:54px; padding:4px 12px calc(80px + env(safe-area-inset-bottom,0px)) 12px; overflow-x:hidden; }
           .main-wrap * { max-width:100%; }
         }
         .main-wrap { flex:1; min-width:0; position:relative; }
