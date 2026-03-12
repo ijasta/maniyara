@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
   getTasks, addTask, updateTask, deleteTask,
@@ -11,6 +11,154 @@ import { supabase,
 import { Avatar, Toggle, Btn, SecHead, ToastProvider, useToast, inp } from '../components/UI'
 
 const EMOJIS = ['🍳','🍽️','🧹','🫧','🚿','🗑️','🛒','🧺','🪣','🧽','💡','🔧','🛁','🍱','🏠','⚡','🪥','🌿']
+
+// ==========================================
+// AUTO-ROTATE TIMER HOOK
+// Returns { timeLeft, label, isImminent, nextFriday }
+// Fires onRotate() when countdown hits 0 (Friday 12:00:00 AM)
+// ==========================================
+function getNextFridayMidnight() {
+  const now = new Date()
+  const day = now.getDay() // 0=Sun,1=Mon,...,5=Fri,6=Sat
+  const daysUntilFriday = (5 - day + 7) % 7 || 7
+  const next = new Date(now)
+  next.setDate(now.getDate() + daysUntilFriday)
+  next.setHours(0, 0, 0, 0) // midnight = 12:00 AM
+  return next
+}
+
+export function useAutoRotateTimer(onRotate) {
+  const [timeLeft, setTimeLeft] = useState(null)
+  const [nextFriday, setNextFriday] = useState(null)
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    const target = getNextFridayMidnight()
+    setNextFriday(target)
+    firedRef.current = false
+
+    const tick = () => {
+      const now = Date.now()
+      const diff = target.getTime() - now
+
+      if (diff <= 0) {
+        setTimeLeft(0)
+        if (!firedRef.current) {
+          firedRef.current = true
+          onRotate && onRotate()
+        }
+        return
+      }
+      setTimeLeft(diff)
+    }
+
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const formatCountdown = (ms) => {
+    if (ms === null) return '...'
+    if (ms <= 0) return '🔄 ROTATING...'
+    const totalSec = Math.floor(ms / 1000)
+    const d = Math.floor(totalSec / 86400)
+    const h = Math.floor((totalSec % 86400) / 3600)
+    const m = Math.floor((totalSec % 3600) / 60)
+    const s = totalSec % 60
+    const pad = n => String(n).padStart(2, '0')
+    if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`
+    return `${pad(h)}:${pad(m)}:${pad(s)}`
+  }
+
+  const isImminent = timeLeft !== null && timeLeft < 3600000 // < 1 hour
+  const label = formatCountdown(timeLeft)
+
+  return { timeLeft, label, isImminent, nextFriday }
+}
+
+// ==========================================
+// AUTO-ROTATE TIMER WIDGET (shared component)
+// ==========================================
+export function AutoRotateTimerWidget({ onRotate, compact = false }) {
+  const { label, isImminent, timeLeft, nextFriday } = useAutoRotateTimer(onRotate)
+
+  const color = timeLeft === 0 ? '#7DF9AA' : isImminent ? '#FF6B6B' : '#FFD93D'
+  const glowColor = timeLeft === 0 ? 'rgba(125,249,170,.4)' : isImminent ? 'rgba(255,107,107,.4)' : 'rgba(255,217,61,.35)'
+  const bg = timeLeft === 0 ? 'rgba(125,249,170,.08)' : isImminent ? 'rgba(255,107,107,.08)' : 'rgba(255,217,61,.06)'
+  const border = timeLeft === 0 ? 'rgba(125,249,170,.3)' : isImminent ? 'rgba(255,107,107,.3)' : 'rgba(255,217,61,.25)'
+
+  if (compact) {
+    return (
+      <div style={{
+        display:'inline-flex', alignItems:'center', gap:6,
+        background: bg, border:`1px solid ${border}`,
+        borderRadius:99, padding:'5px 12px',
+        boxShadow: timeLeft !== null && timeLeft < 600000 ? `0 0 14px ${glowColor}` : 'none',
+        transition:'all .3s'
+      }}>
+        <span style={{fontSize:13}}>⏰</span>
+        <span style={{
+          fontFamily:'Orbitron,monospace', fontSize:12, fontWeight:700,
+          color, letterSpacing:1,
+          animation: isImminent ? 'timerPulse 1s ease-in-out infinite' : 'none'
+        }}>{label}</span>
+        <style>{`@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      background: bg,
+      border:`2px solid ${border}`,
+      borderRadius:13, padding:'14px 16px', marginBottom:16,
+      boxShadow: isImminent ? `0 0 20px ${glowColor}` : 'none',
+      transition:'all .3s'
+    }}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{
+          width:44,height:44,borderRadius:11,flexShrink:0,
+          background:`${color}15`, border:`1px solid ${color}30`,
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:22
+        }}>⏰</div>
+        <div style={{flex:1}}>
+          <div style={{
+            fontSize:10,fontWeight:700,color,textTransform:'uppercase',
+            letterSpacing:'.1em',marginBottom:2
+          }}>
+            {timeLeft === 0 ? '🔄 AUTO-ROTATING NOW' : isImminent ? '⚡ ROTATION IMMINENT' : '🔄 NEXT AUTO-ROTATION'}
+          </div>
+          <div style={{
+            fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:900,
+            color, letterSpacing:2,
+            animation: isImminent ? 'timerPulse 1s ease-in-out infinite' : 'none',
+            textShadow: `0 0 20px ${glowColor}`
+          }}>{label}</div>
+          <style>{`@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+        </div>
+        <div style={{textAlign:'right',flexShrink:0}}>
+          <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em'}}>Every Friday</div>
+          <div style={{fontSize:11,fontWeight:700,color:'#8890b0',marginTop:2}}>12:00 AM</div>
+          {nextFriday && (
+            <div style={{fontSize:10,color:'#4a5070',marginTop:2}}>
+              {nextFriday.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}
+            </div>
+          )}
+        </div>
+      </div>
+      {isImminent && timeLeft > 0 && (
+        <div style={{marginTop:10,padding:'7px 10px',borderRadius:8,background:'rgba(255,107,107,.08)',border:'1px solid rgba(255,107,107,.15)'}}>
+          <div style={{fontSize:11,color:'#FF6B6B',fontWeight:700}}>⚠️ Auto-rotation fires in less than 1 hour! Tasks will be assigned to all members automatically.</div>
+        </div>
+      )}
+      {timeLeft === 0 && (
+        <div style={{marginTop:10,padding:'7px 10px',borderRadius:8,background:'rgba(125,249,170,.08)',border:'1px solid rgba(125,249,170,.2)'}}>
+          <div style={{fontSize:11,color:'#7DF9AA',fontWeight:700}}>✅ Auto-rotation triggered! Tasks have been rotated to next week.</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function AdminContent() {
   const toast = useToast()
@@ -32,7 +180,6 @@ function AdminContent() {
         getPendingMembers(), getMembers(), getTasks(),
         getCurrentAssignments(), getSettings(), getLogs()
       ])
-      // Also fetch treasurer_id from fund_settings (it's NOT in settings table)
       const { data: fs } = await supabase.from('fund_settings').select('treasurer_id').eq('id', 1).single()
       const merged = { ...st, treasurer_id: fs?.treasurer_id ?? null, kitchen_assigner_id: st?.kitchen_assigner_id ?? null }
       setPending(pend); setMembers(mem); setTasks(tk)
@@ -40,6 +187,24 @@ function AdminContent() {
     } catch(e) { toast('Load error: '+e.message,'error') }
     finally { setLoading(false) }
   }
+
+  // Auto-rotate handler — called automatically when Friday 12AM hits
+  const handleAutoRotate = useCallback(async () => {
+    try {
+      const allApproved = members.filter(m => m.status === 'approved')
+      const curAssigns  = assigns
+      const allAssigned = allApproved.every(m => curAssigns.find(a => a.member_id === m.id || a.members?.id === m.id))
+      if (!allAssigned) {
+        toast('⚠️ Auto-rotation skipped: not all members have tasks assigned','warn')
+        return
+      }
+      const newWeek = await rotateToNextWeek()
+      toast(`🔄 Auto-rotated to Week ${newWeek}! (Friday 12:00 AM)`)
+      load()
+    } catch(e) {
+      toast('Auto-rotation failed: '+e.message,'error')
+    }
+  }, [members, assigns])
 
   const TABS = [
     { id:'assign',   label:'📋 Assign' },
@@ -72,7 +237,7 @@ function AdminContent() {
       </div>
 
       {tab==='controls'  && <SiteControlsTab settings={settings} toast={toast} onDone={load}/>}
-      {tab==='assign'    && <AssignTab members={members} tasks={tasks} assigns={assigns} week={week} toast={toast} onDone={load}/>}
+      {tab==='assign'    && <AssignTab members={members} tasks={tasks} assigns={assigns} week={week} toast={toast} onDone={load} onAutoRotate={handleAutoRotate}/>}
       {tab==='expenses'  && <ExpensesAdminTab toast={toast} members={members}/>}
       {tab==='whatsapp'  && <WhatsAppTab members={members} assigns={assigns} week={week} toast={toast}/>}
       {tab==='settings'  && <SettingsTab settings={settings} week={week} toast={toast} onDone={load} members={members} assigns={assigns} tasks={tasks}/>}
@@ -152,7 +317,7 @@ function AdminContent() {
               </select>
             </div>
 
-            {/* Fund Treasurer — FIXED: saves to fund_settings table */}
+            {/* Fund Treasurer */}
             <div style={{background:'#0d0e1a',border:`2px solid ${settings?.treasurer_id?'rgba(255,217,61,.3)':'rgba(255,217,61,.1)'}`,borderRadius:13,padding:14,transition:'border-color .2s'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
                 <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,217,61,.08)',border:'1px solid rgba(255,217,61,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>🏦</div>
@@ -181,11 +346,7 @@ function AdminContent() {
                 onChange={async e=>{
                   const val = e.target.value || null
                   try {
-                    // treasurer_id lives ONLY in fund_settings, NOT in settings table
-                    const { error } = await supabase
-                      .from('fund_settings')
-                      .update({ treasurer_id: val })
-                      .eq('id', 1)
+                    const { error } = await supabase.from('fund_settings').update({ treasurer_id: val }).eq('id', 1)
                     if (error) throw error
                     toast(val ? 'Treasurer assigned ✅' : 'Treasurer removed', 'warn')
                     load()
@@ -244,7 +405,6 @@ function AdminContent() {
       {/* ── MEMBERS ── */}
       {tab==='members' && (
         <div>
-          {/* Summary strip */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:16}}>
             {[
               { label:'Total',    value:members.length,                               color:'#7DF9AA' },
@@ -257,13 +417,10 @@ function AdminContent() {
               </div>
             ))}
           </div>
-
           {members.map(m => {
             const assign = assigns.find(a=>a.member_id===m.id||a.members?.id===m.id)
             const task   = assign?.tasks
-            return (
-              <MemberCard key={m.id} m={m} task={task} assign={assign} toast={toast} onDone={load}/>
-            )
+            return <MemberCard key={m.id} m={m} task={task} assign={assign} toast={toast} onDone={load}/>
           })}
         </div>
       )}
@@ -312,7 +469,7 @@ function AdminContent() {
 }
 
 // ==========================================
-// MEMBER CARD — attractive redesign
+// MEMBER CARD
 // ==========================================
 function MemberCard({ m, task, assign, toast, onDone }) {
   const [expanded,  setExpanded]  = useState(false)
@@ -326,19 +483,13 @@ function MemberCard({ m, task, assign, toast, onDone }) {
   const changePassword = async () => {
     if (!newPw)           { toast('Enter a new password','warn'); return }
     if (newPw.length < 6) { toast('Min 6 characters','warn'); return }
-    if (!confirm(`Set new password for ${m.name}?\n\nMake sure to tell them their new password!`)) return
+    if (!confirm(`Set new password for ${m.name}?`)) return
     setPwLoading(true)
     try {
       const res = await fetch(
         `https://fnnnetofvsggioysairt.supabase.co/functions/v1/admin-reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({ user_id: m.id, new_password: newPw })
-        }
+        { method:'POST', headers:{'Content-Type':'application/json','apikey':import.meta.env.VITE_SUPABASE_ANON_KEY},
+          body: JSON.stringify({ user_id: m.id, new_password: newPw }) }
       )
       let data = {}
       try { data = await res.json() } catch(_) {}
@@ -351,24 +502,12 @@ function MemberCard({ m, task, assign, toast, onDone }) {
 
   return (
     <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:16,marginBottom:12,overflow:'hidden',transition:'border-color .2s'}}>
-
-      {/* ── TOP COLOR BAR ── */}
       <div style={{height:3,background:`linear-gradient(90deg,transparent,${m.color||'#7DF9AA'},transparent)`,opacity:.7}}/>
-
-      {/* ── HEADER ROW ── */}
       <div style={{padding:'14px 14px 12px',display:'flex',alignItems:'center',gap:12}}>
-        {/* Avatar with ring */}
         <div style={{position:'relative',flexShrink:0}}>
-          <div style={{width:50,height:50,borderRadius:14,background:`${m.color||'#7DF9AA'}22`,border:`2px solid ${m.color||'#7DF9AA'}55`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
-            {m.avatar||'👤'}
-          </div>
-          {/* Online-style status dot */}
-          <div style={{position:'absolute',bottom:1,right:1,width:12,height:12,borderRadius:'50%',
-            background:m.status==='approved'?'#7DF9AA':'#FF6B6B',
-            border:'2px solid #0d0e1a',boxShadow:`0 0 6px ${m.status==='approved'?'rgba(125,249,170,.6)':'rgba(255,107,107,.6)'}`}}/>
+          <div style={{width:50,height:50,borderRadius:14,background:`${m.color||'#7DF9AA'}22`,border:`2px solid ${m.color||'#7DF9AA'}55`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{m.avatar||'👤'}</div>
+          <div style={{position:'absolute',bottom:1,right:1,width:12,height:12,borderRadius:'50%',background:m.status==='approved'?'#7DF9AA':'#FF6B6B',border:'2px solid #0d0e1a',boxShadow:`0 0 6px ${m.status==='approved'?'rgba(125,249,170,.6)':'rgba(255,107,107,.6)'}`}}/>
         </div>
-
-        {/* Name + info */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
             <span style={{fontSize:15,fontWeight:800,color:'#E8F0FF'}}>{m.name}</span>
@@ -380,122 +519,67 @@ function MemberCard({ m, task, assign, toast, onDone }) {
             <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.email}</span>
           </div>
         </div>
-
-        {/* Status + expand */}
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
-          <span style={{fontSize:9,padding:'3px 9px',borderRadius:99,fontWeight:700,background:statusBg,color:statusColor,border:`1px solid ${statusColor}44`,letterSpacing:'.06em'}}>
-            {m.status?.toUpperCase()}
-          </span>
-          <button onClick={()=>setExpanded(x=>!x)}
-            style={{fontSize:11,padding:'3px 10px',borderRadius:99,border:'1px solid rgba(125,249,170,.15)',background:'transparent',color:'#4a5070',cursor:'pointer',fontFamily:'Rajdhani,sans-serif',fontWeight:700,transition:'all .15s'}}>
-            {expanded ? '▲ Less' : '▼ Edit'}
-          </button>
+          <span style={{fontSize:9,padding:'3px 9px',borderRadius:99,fontWeight:700,background:statusBg,color:statusColor,border:`1px solid ${statusColor}44`,letterSpacing:'.06em'}}>{m.status?.toUpperCase()}</span>
+          <button onClick={()=>setExpanded(x=>!x)} style={{fontSize:11,padding:'3px 10px',borderRadius:99,border:'1px solid rgba(125,249,170,.15)',background:'transparent',color:'#4a5070',cursor:'pointer',fontFamily:'Rajdhani,sans-serif',fontWeight:700,transition:'all .15s'}}>{expanded ? '▲ Less' : '▼ Edit'}</button>
         </div>
       </div>
-
-      {/* ── TASK CHIP ── */}
       <div style={{padding:'0 14px 12px'}}>
         <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(255,255,255,.03)',borderRadius:9,padding:'8px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
           <span style={{fontSize:16}}>{task?.emoji||'📋'}</span>
           <span style={{fontSize:12,color:task?'#8890b0':'#4a5070',flex:1}}>{task?.name||'No task assigned this week'}</span>
           {assign && (
-            <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:99,
-              background:assign.done?'rgba(125,249,170,.12)':'rgba(255,107,107,.1)',
-              border:`1px solid ${assign.done?'rgba(125,249,170,.3)':'rgba(255,107,107,.25)'}`,
-              color:assign.done?'#7DF9AA':'#FF6B6B'}}>
-              {assign.done?'✅ Done':'⏳ Pending'}
-            </span>
+            <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:99,background:assign.done?'rgba(125,249,170,.12)':'rgba(255,107,107,.1)',border:`1px solid ${assign.done?'rgba(125,249,170,.3)':'rgba(255,107,107,.25)'}`,color:assign.done?'#7DF9AA':'#FF6B6B'}}>{assign.done?'✅ Done':'⏳ Pending'}</span>
           )}
         </div>
       </div>
-
-
-
-      {/* ── EXPANDABLE EDIT PANEL ── */}
       {expanded && (
         <div style={{borderTop:'1px solid rgba(125,249,170,.07)',padding:'14px 14px',background:'rgba(0,0,0,.2)'}}>
-
-          {/* Name + Phone */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:12}}>
             {[['Name',m.name,'name','text'],['Phone',m.phone,'phone','tel']].map(([lb,val,key,type])=>(
               <div key={key} style={{gridColumn:key==='name'?'1/-1':undefined}}>
                 <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>{lb}</label>
-                <input defaultValue={val||''} type={type}
-                  onBlur={async e=>{await updateMember(m.id,{[key]:e.target.value});toast(`${lb} updated ✅`)}}
-                  style={{...inp,padding:'9px 11px',fontSize:'14px'}}/>
+                <input defaultValue={val||''} type={type} onBlur={async e=>{await updateMember(m.id,{[key]:e.target.value});toast(`${lb} updated ✅`)}} style={{...inp,padding:'9px 11px',fontSize:'14px'}}/>
               </div>
             ))}
           </div>
-
-          {/* Avatar picker */}
           <div style={{marginBottom:11}}>
             <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Avatar</label>
             <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
               {AVATARS.map(av=>(
-                <button key={av} onClick={async()=>{await updateMember(m.id,{avatar:av});toast('Saved');onDone()}}
-                  style={{fontSize:18,padding:'5px 7px',borderRadius:7,border:`1px solid ${m.avatar===av?'#7DF9AA':'transparent'}`,background:m.avatar===av?'rgba(125,249,170,.1)':'#131525',cursor:'pointer',transition:'all .1s'}}>{av}</button>
+                <button key={av} onClick={async()=>{await updateMember(m.id,{avatar:av});toast('Saved');onDone()}} style={{fontSize:18,padding:'5px 7px',borderRadius:7,border:`1px solid ${m.avatar===av?'#7DF9AA':'transparent'}`,background:m.avatar===av?'rgba(125,249,170,.1)':'#131525',cursor:'pointer',transition:'all .1s'}}>{av}</button>
               ))}
             </div>
           </div>
-
-          {/* Color picker */}
           <div style={{marginBottom:12}}>
             <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Color</label>
             <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
               {COLORS.map(c=>(
-                <button key={c} onClick={async()=>{await updateMember(m.id,{color:c});toast('Saved');onDone()}}
-                  style={{width:26,height:26,borderRadius:'50%',background:c,border:`3px solid ${m.color===c?'#fff':'transparent'}`,cursor:'pointer',transition:'transform .1s',transform:m.color===c?'scale(1.2)':'scale(1)'}}/>
+                <button key={c} onClick={async()=>{await updateMember(m.id,{color:c});toast('Saved');onDone()}} style={{width:26,height:26,borderRadius:'50%',background:c,border:`3px solid ${m.color===c?'#fff':'transparent'}`,cursor:'pointer',transition:'transform .1s',transform:m.color===c?'scale(1.2)':'scale(1)'}}/>
               ))}
             </div>
           </div>
-
-          {/* Toggles */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:12}}>
             {[['Admin',m.is_admin,'is_admin'],['Approved',m.status==='approved','status']].map(([lb,val,key])=>(
               <div key={key} style={{display:'flex',alignItems:'center',gap:8,background:'#131525',borderRadius:9,padding:'10px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
                 <span style={{fontSize:12,fontWeight:700,flex:1,color:'#E8F0FF'}}>{lb}</span>
-                <Toggle value={!!val} onChange={async v=>{
-                  const upd=key==='status'?{status:v?'approved':'pending'}:{[key]:v}
-                  await updateMember(m.id,upd);toast(`${lb} ${v?'on':'off'}`);onDone()
-                }}/>
+                <Toggle value={!!val} onChange={async v=>{const upd=key==='status'?{status:v?'approved':'pending'}:{[key]:v};await updateMember(m.id,upd);toast(`${lb} ${v?'on':'off'}`);onDone()}}/>
               </div>
             ))}
           </div>
-
-          {/* ── CHANGE PASSWORD ── */}
           <div style={{background:'rgba(123,97,255,.07)',border:'1px solid rgba(123,97,255,.2)',borderRadius:10,padding:'12px 13px',marginBottom:12}}>
             <div style={{fontSize:10,fontWeight:700,color:'#A78BFA',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>🔑 Change Password</div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
               <div style={{position:'relative',flex:1}}>
-                <input
-                  type={showPw?'text':'password'}
-                  value={newPw}
-                  onChange={e=>setNewPw(e.target.value)}
-                  placeholder="New password (min 6 chars)"
-                  onKeyDown={e=>e.key==='Enter'&&changePassword()}
-                  style={{...inp,padding:'10px 38px 10px 12px',fontSize:13,width:'100%',letterSpacing:newPw&&!showPw?2:0}}/>
-                <button onClick={()=>setShowPw(x=>!x)}
-                  style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:14,color:'#4a5070',padding:2}}>
-                  {showPw?'🙈':'👁️'}
-                </button>
+                <input type={showPw?'text':'password'} value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="New password (min 6 chars)" onKeyDown={e=>e.key==='Enter'&&changePassword()} style={{...inp,padding:'10px 38px 10px 12px',fontSize:13,width:'100%',letterSpacing:newPw&&!showPw?2:0}}/>
+                <button onClick={()=>setShowPw(x=>!x)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:14,color:'#4a5070',padding:2}}>{showPw?'🙈':'👁️'}</button>
               </div>
-              <button onClick={changePassword} disabled={pwLoading}
-                style={{padding:'10px 14px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:12,cursor:'pointer',flexShrink:0,border:'none',background:pwLoading?'#1a2030':'linear-gradient(135deg,#A78BFA,#7B61FF)',color:'#fff',opacity:pwLoading?0.6:1,whiteSpace:'nowrap',transition:'all .15s'}}>
-                {pwLoading?'⏳...':'✓ Set'}
-              </button>
+              <button onClick={changePassword} disabled={pwLoading} style={{padding:'10px 14px',borderRadius:9,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:12,cursor:'pointer',flexShrink:0,border:'none',background:pwLoading?'#1a2030':'linear-gradient(135deg,#A78BFA,#7B61FF)',color:'#fff',opacity:pwLoading?0.6:1,whiteSpace:'nowrap',transition:'all .15s'}}>{pwLoading?'⏳...':'✓ Set'}</button>
             </div>
-            {newPw.length>0 && newPw.length<6 && (
-              <div style={{fontSize:11,color:'#FF6B6B',marginTop:5}}>⚠️ Too short — min 6 characters</div>
-            )}
-            {newPw.length>=6 && (
-              <div style={{fontSize:11,color:'#7DF9AA',marginTop:5}}>✅ Good — press Set to apply</div>
-            )}
+            {newPw.length>0 && newPw.length<6 && <div style={{fontSize:11,color:'#FF6B6B',marginTop:5}}>⚠️ Too short — min 6 characters</div>}
+            {newPw.length>=6 && <div style={{fontSize:11,color:'#7DF9AA',marginTop:5}}>✅ Good — press Set to apply</div>}
           </div>
-
-          {/* Remove button */}
-          <Btn variant="danger" full onClick={async()=>{if(!confirm(`Remove ${m.name} from the house?`)) return;await deleteMember(m.id);toast(`${m.name} removed`,'warn');onDone()}}>
-            ✕ Remove Member
-          </Btn>
+          <Btn variant="danger" full onClick={async()=>{if(!confirm(`Remove ${m.name} from the house?`)) return;await deleteMember(m.id);toast(`${m.name} removed`,'warn');onDone()}}>✕ Remove Member</Btn>
         </div>
       )}
     </div>
@@ -507,17 +591,12 @@ function MemberCard({ m, task, assign, toast, onDone }) {
 // ==========================================
 function LogsTab({ logs, members, onClear }) {
   const [filter, setFilter] = useState('all')
-
   const isFund   = a => { const x=a?.toLowerCase()||''; return x.includes('fund')||x.includes('transaction')||x.includes('treasurer') }
   const isLogin  = a => { const x=a?.toLowerCase()||''; return x.includes('login')||x.includes('logged')||x.includes('signup')||x.includes('sign in')||x.includes('register')||x.includes('approv')||x.includes('reject')||x.includes('joined') }
-
   const getIcon  = a => isFund(a) ? '🏦' : isLogin(a) ? '👤' : '📋'
   const getColor = a => isFund(a) ? '#FFD93D' : isLogin(a) ? '#7DF9AA' : '#8890b0'
-
-  // Show ALL logs — filter by type
-  const relevant = logs  // show everything
+  const relevant = logs
   const filtered = filter==='all' ? relevant : filter==='fund' ? relevant.filter(l=>isFund(l.action)) : relevant.filter(l=>isLogin(l.action))
-
   const formatTime = ts => {
     const diff = Date.now() - new Date(ts)
     if (diff < 60000)    return 'Just now'
@@ -526,85 +605,45 @@ function LogsTab({ logs, members, onClear }) {
     if (diff < 604800000)return `${Math.floor(diff/86400000)}d ago`
     return new Date(ts).toLocaleDateString('en-IN',{day:'numeric',month:'short'})
   }
-
   const fundLogs  = logs.filter(l=>isFund(l.action))
   const loginLogs = logs.filter(l=>isLogin(l.action))
-
   return (
     <div>
-      {/* Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:9,marginBottom:14}}>
-        {[
-          {label:'Total',          value:logs.length,       color:'#7DF9AA'},
-          {label:'🏦 Fund',        value:fundLogs.length,   color:'#FFD93D'},
-          {label:'👤 Logins',      value:loginLogs.length,  color:'#4D96FF'},
-        ].map(s=>(
+        {[{label:'Total',value:logs.length,color:'#7DF9AA'},{label:'🏦 Fund',value:fundLogs.length,color:'#FFD93D'},{label:'👤 Logins',value:loginLogs.length,color:'#4D96FF'}].map(s=>(
           <div key={s.label} style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.08)',borderRadius:11,padding:'13px 12px',textAlign:'center'}}>
             <div style={{fontFamily:'Orbitron,monospace',fontSize:22,fontWeight:900,color:s.color}}>{s.value}</div>
             <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:3}}>{s.label}</div>
           </div>
         ))}
       </div>
-
-      {/* Filter tabs */}
       <div style={{display:'flex',gap:7,marginBottom:14}}>
-        {[
-          {key:'all',   label:'All',          color:'#7DF9AA', count:relevant.length},
-          {key:'fund',  label:'🏦 Fund',      color:'#FFD93D', count:fundLogs.length},
-          {key:'login', label:'👤 Members',   color:'#7DF9AA', count:loginLogs.length},
-        ].map(t=>(
-          <button key={t.key} onClick={()=>setFilter(t.key)}
-            style={{flex:1,padding:'9px 6px',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all .15s',
-              border:`1px solid ${filter===t.key?t.color:'rgba(255,255,255,.08)'}`,
-              background:filter===t.key?`${t.color}15`:'#0d0e1a',
-              color:filter===t.key?t.color:'#4a5070'}}>
-            {t.label}<br/>
-            <span style={{fontFamily:'Orbitron,monospace',fontSize:14,fontWeight:900}}>{t.count}</span>
+        {[{key:'all',label:'All',color:'#7DF9AA',count:relevant.length},{key:'fund',label:'🏦 Fund',color:'#FFD93D',count:fundLogs.length},{key:'login',label:'👤 Members',color:'#7DF9AA',count:loginLogs.length}].map(t=>(
+          <button key={t.key} onClick={()=>setFilter(t.key)} style={{flex:1,padding:'9px 6px',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',transition:'all .15s',border:`1px solid ${filter===t.key?t.color:'rgba(255,255,255,.08)'}`,background:filter===t.key?`${t.color}15`:'#0d0e1a',color:filter===t.key?t.color:'#4a5070'}}>
+            {t.label}<br/><span style={{fontFamily:'Orbitron,monospace',fontSize:14,fontWeight:900}}>{t.count}</span>
           </button>
         ))}
       </div>
-
-      {/* Log list */}
       {filtered.length===0 ? (
-        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:40,textAlign:'center',color:'#4a5070'}}>
-          <div style={{fontSize:36,marginBottom:10}}>📭</div>
-          <div style={{fontSize:14,fontWeight:600}}>No logs yet</div>
-          <div style={{fontSize:12,marginTop:4}}>Fund transactions and member joins will appear here</div>
-        </div>
+        <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:40,textAlign:'center',color:'#4a5070'}}><div style={{fontSize:36,marginBottom:10}}>📭</div><div style={{fontSize:14,fontWeight:600}}>No logs yet</div></div>
       ) : (
         <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,overflow:'hidden',marginBottom:14}}>
           {filtered.map((l,i)=>(
             <div key={l.id} style={{padding:'13px 14px',borderBottom:i<filtered.length-1?'1px solid rgba(125,249,170,.05)':'none',display:'flex',gap:11,alignItems:'flex-start'}}>
-              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
-                background:`${getColor(l.action)}15`,border:`1px solid ${getColor(l.action)}30`,
-                display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,marginTop:1}}>
-                {getIcon(l.action)}
-              </div>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,background:`${getColor(l.action)}15`,border:`1px solid ${getColor(l.action)}30`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,marginTop:1}}>{getIcon(l.action)}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',lineHeight:1.4}}>{l.action}</div>
                 <div style={{display:'flex',gap:8,marginTop:4,flexWrap:'wrap',alignItems:'center'}}>
-                  {l.actor && (
-                    <span style={{fontSize:11,color:'#8890b0'}}>
-                      by <span style={{color:getColor(l.action),fontWeight:700}}>{l.actor}</span>
-                    </span>
-                  )}
+                  {l.actor && <span style={{fontSize:11,color:'#8890b0'}}>by <span style={{color:getColor(l.action),fontWeight:700}}>{l.actor}</span></span>}
                   {l.details && <span style={{fontSize:11,color:'#4a5070'}}>· {l.details}</span>}
                 </div>
               </div>
-              <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0,marginTop:2,textAlign:'right'}}>
-                {formatTime(l.created_at)}
-              </div>
+              <div style={{fontSize:10,color:'#4a5070',whiteSpace:'nowrap',flexShrink:0,marginTop:2,textAlign:'right'}}>{formatTime(l.created_at)}</div>
             </div>
           ))}
         </div>
       )}
-
-      {logs.length>0 && (
-        <button onClick={onClear}
-          style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',letterSpacing:'.04em'}}>
-          🗑️ Clear All Logs
-        </button>
-      )}
+      {logs.length>0 && <button onClick={onClear} style={{width:'100%',padding:12,borderRadius:10,fontFamily:'Rajdhani,sans-serif',fontWeight:700,fontSize:13,cursor:'pointer',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',letterSpacing:'.04em'}}>🗑️ Clear All Logs</button>}
     </div>
   )
 }
@@ -614,9 +653,7 @@ function LogsTab({ logs, members, onClear }) {
 // ==========================================
 function WhatsAppTab({ members, assigns, week, toast }) {
   const approved = members.filter(m => m.status === 'approved')
-  const [msgTemplate, setMsgTemplate] = useState(
-    `🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`
-  )
+  const [msgTemplate, setMsgTemplate] = useState(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)
   const buildMsg = (member) => {
     const a = assigns.find(x => x.member_id===member.id || x.members?.id===member.id)
     const t = a?.tasks
@@ -640,15 +677,10 @@ function WhatsAppTab({ members, assigns, week, toast }) {
         <div>
           <div style={{background:'rgba(37,211,102,.07)',border:'2px solid rgba(37,211,102,.3)',borderRadius:14,padding:16,marginBottom:14,textAlign:'center'}}>
             <div style={{fontSize:11,fontWeight:700,color:'#25D366',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:6}}>SENDING {queueIdx+1} of {approved.length}</div>
-            <div style={{background:'rgba(255,255,255,.08)',borderRadius:99,height:6,marginBottom:14,overflow:'hidden'}}>
-              <div style={{height:'100%',borderRadius:99,background:'linear-gradient(90deg,#25D366,#128C7E)',width:`${(queueIdx/approved.length)*100}%`,transition:'width .3s'}}/>
-            </div>
+            <div style={{background:'rgba(255,255,255,.08)',borderRadius:99,height:6,marginBottom:14,overflow:'hidden'}}><div style={{height:'100%',borderRadius:99,background:'linear-gradient(90deg,#25D366,#128C7E)',width:`${(queueIdx/approved.length)*100}%`,transition:'width .3s'}}/></div>
             <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',marginBottom:14}}>
               {approved.map((m,i)=>(
-                <div key={m.id} style={{fontSize:11,padding:'3px 10px',borderRadius:99,fontWeight:700,
-                  background:sent.includes(m.id)?'rgba(37,211,102,.15)':i===queueIdx?'rgba(255,217,61,.15)':'rgba(255,255,255,.05)',
-                  border:`1px solid ${sent.includes(m.id)?'rgba(37,211,102,.3)':i===queueIdx?'rgba(255,217,61,.3)':'rgba(255,255,255,.08)'}`,
-                  color:sent.includes(m.id)?'#25D366':i===queueIdx?'#FFD93D':'#4a5070'}}>
+                <div key={m.id} style={{fontSize:11,padding:'3px 10px',borderRadius:99,fontWeight:700,background:sent.includes(m.id)?'rgba(37,211,102,.15)':i===queueIdx?'rgba(255,217,61,.15)':'rgba(255,255,255,.05)',border:`1px solid ${sent.includes(m.id)?'rgba(37,211,102,.3)':i===queueIdx?'rgba(255,217,61,.3)':'rgba(255,255,255,.08)'}`,color:sent.includes(m.id)?'#25D366':i===queueIdx?'#FFD93D':'#4a5070'}}>
                   {sent.includes(m.id)?'✅':i===queueIdx?'👉':'⏳'} {m.name}
                 </div>
               ))}
@@ -658,12 +690,8 @@ function WhatsAppTab({ members, assigns, week, toast }) {
             <div style={{background:'#0d0e1a',border:'2px solid rgba(255,217,61,.25)',borderRadius:14,padding:16,marginBottom:14,textAlign:'center'}}>
               <Avatar emoji={currentMember.avatar} color={currentMember.color} size={56}/>
               <div style={{fontWeight:800,fontSize:18,marginTop:10,marginBottom:4}}>{currentMember.name}</div>
-              <div style={{fontSize:12,color:'#8890b0',marginBottom:16}}>
-                {(()=>{const a=assigns.find(x=>x.member_id===currentMember.id||x.members?.id===currentMember.id);const t=a?.tasks;return t?`${t.emoji} ${t.name}`:'⚠️ No task assigned'})()}
-              </div>
-              <button onClick={sendCurrent} style={{width:'100%',padding:16,borderRadius:12,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.35)'}}>
-                📱 Send to {currentMember.name} →
-              </button>
+              <div style={{fontSize:12,color:'#8890b0',marginBottom:16}}>{(()=>{const a=assigns.find(x=>x.member_id===currentMember.id||x.members?.id===currentMember.id);const t=a?.tasks;return t?`${t.emoji} ${t.name}`:'⚠️ No task assigned'})()}</div>
+              <button onClick={sendCurrent} style={{width:'100%',padding:16,borderRadius:12,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.35)'}}>📱 Send to {currentMember.name} →</button>
               <div style={{fontSize:11,color:'#4a5070',marginTop:8}}>Tap → opens WhatsApp → come back → tap next</div>
             </div>
           )}
@@ -675,18 +703,13 @@ function WhatsAppTab({ members, assigns, week, toast }) {
             <div style={{fontSize:36,marginBottom:8}}>📢</div>
             <div style={{fontFamily:'Orbitron,monospace',fontSize:13,fontWeight:800,color:'#25D366',letterSpacing:1,marginBottom:6}}>BROADCAST TO ALL</div>
             <div style={{fontSize:12,color:'#8890b0',marginBottom:16,lineHeight:1.7}}>Guides you through sending WhatsApp to each member one by one.</div>
-            <button onClick={startQueue} style={{width:'100%',padding:'15px',borderRadius:12,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.3)'}}>
-              📱 Start Broadcast — {approved.length} Members
-            </button>
+            <button onClick={startQueue} style={{width:'100%',padding:'15px',borderRadius:12,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#25D366,#128C7E)',color:'#fff',fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:16,letterSpacing:'.08em',boxShadow:'0 4px 20px rgba(37,211,102,.3)'}}>📱 Start Broadcast — {approved.length} Members</button>
           </div>
           <SecHead title="📝 Message Template"/>
           <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
             <div style={{fontSize:11,color:'#8890b0',marginBottom:10,lineHeight:1.6}}>Use <span style={{color:'#7DF9AA',fontWeight:700}}>{'{name}'}</span> and <span style={{color:'#7DF9AA',fontWeight:700}}>{'{task}'}</span> placeholders.</div>
             <textarea value={msgTemplate} onChange={e=>setMsgTemplate(e.target.value)} rows={7} style={{...inp,width:'100%',resize:'vertical',fontSize:13,lineHeight:1.7}}/>
-            <button onClick={()=>setMsgTemplate(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)}
-              style={{marginTop:9,padding:'7px 14px',borderRadius:8,border:'1px solid rgba(125,249,170,.2)',background:'transparent',color:'#7DF9AA',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Rajdhani,sans-serif'}}>
-              ↺ Reset to Default
-            </button>
+            <button onClick={()=>setMsgTemplate(`🏠 MANIYARA — Week ${week}\n\nHey {name}! 👋\nYour task this week: {task}\n\nPlease mark it done on the app once completed! ✅\n\nApp: https://maniyara.pages.dev`)} style={{marginTop:9,padding:'7px 14px',borderRadius:8,border:'1px solid rgba(125,249,170,.2)',background:'transparent',color:'#7DF9AA',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Rajdhani,sans-serif'}}>↺ Reset to Default</button>
           </div>
           <SecHead title="📱 Send Individually"/>
           <div style={{display:'flex',flexDirection:'column',gap:9}}>
@@ -713,16 +736,16 @@ function WhatsAppTab({ members, assigns, week, toast }) {
 }
 
 // ==========================================
-// ASSIGN TAB
+// ASSIGN TAB — with Auto-Rotate Timer
 // ==========================================
-function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
+function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate }) {
   const approved    = members.filter(m => m.status === 'approved')
   const activeTasks = tasks.filter(t => t.active)
   const [taskMap,   setTaskMap]   = useState(() => {
     const m = {}; assigns.forEach(a=>{ m[a.member_id||a.members?.id] = a.task_id||a.tasks?.id }); return m
   })
   const [savingAll,  setSavingAll]  = useState(false)
-  const [autoSaving, setAutoSaving] = useState(null) // member id
+  const [autoSaving, setAutoSaving] = useState(null)
   const [rotating,   setRotating]   = useState(false)
 
   useEffect(() => {
@@ -731,20 +754,15 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
 
   const allAssigned = approved.every(m => taskMap[m.id])
 
-  // Auto-save immediately on select
   const autoSaveTask = async (member, taskId) => {
     setTaskMap(p => ({ ...p, [member.id]: taskId }))
     if (!taskId) return
     setAutoSaving(member.id)
-    try {
-      await adminAssignTasks([{ member_id: member.id, task_id: taskId }])
-      toast(`✅ ${member.name} saved!`)
-      onDone()
-    } catch(e) { toast('Auto-save failed: '+e.message,'error') }
+    try { await adminAssignTasks([{ member_id: member.id, task_id: taskId }]); toast(`✅ ${member.name} saved!`); onDone() }
+    catch(e) { toast('Auto-save failed: '+e.message,'error') }
     finally { setAutoSaving(null) }
   }
 
-  // Save ALL at once fallback
   const saveAll = async () => {
     const unassigned = approved.filter(m=>!taskMap[m.id])
     if (unassigned.length>0) { toast(`Pick tasks for: ${unassigned.map(m=>m.name).join(', ')}`, 'warn'); return }
@@ -783,7 +801,10 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
         </div>
       </div>
 
-      {/* ── ROTATE SECTION (TOP) ── */}
+      {/* ── AUTO-ROTATE TIMER ── */}
+      <AutoRotateTimerWidget onRotate={onAutoRotate} />
+
+      {/* ── ROTATE SECTION ── */}
       <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
         <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
         <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
@@ -827,21 +848,14 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
                 {isSaving ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(77,150,255,.1)',border:'1px solid rgba(77,150,255,.25)',color:'#4D96FF'}}>💾 Saving...</div>
                 ) : cur ? (
-                  <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,
-                    background:cur.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',
-                    border:`1px solid ${cur.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,
-                    color:cur.done?'#7DF9AA':'#FFD93D'}}>
-                    {cur.done?'✅ Done':'⏳ Pending'}
-                  </div>
+                  <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,background:cur.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',border:`1px solid ${cur.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,color:cur.done?'#7DF9AA':'#FFD93D'}}>{cur.done?'✅ Done':'⏳ Pending'}</div>
                 ) : taskMap[m.id] ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(125,249,170,.06)',border:'1px solid rgba(125,249,170,.15)',color:'#7DF9AA'}}>✓ Assigned</div>
                 ) : null}
               </div>
               <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                <select value={taskMap[m.id]||''} onChange={e=>autoSaveTask(m, e.target.value)}
-                  disabled={isSaving}
-                  style={{...inp,flex:1,padding:'10px 13px',opacity:isSaving?0.6:1,
-                    borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
+                <select value={taskMap[m.id]||''} onChange={e=>autoSaveTask(m, e.target.value)} disabled={isSaving}
+                  style={{...inp,flex:1,padding:'10px 13px',opacity:isSaving?0.6:1,borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
                   <option value="">— Pick a task —</option>
                   {activeTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
                 </select>
@@ -850,11 +864,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
                     style={{padding:'10px 12px',borderRadius:9,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,flexShrink:0}}>🗑️</button>
                 )}
               </div>
-              {cur?.tasks && (
-                <div style={{fontSize:11,color:'#4a5070',marginTop:5,paddingLeft:2}}>
-                  Current: <span style={{color:'#8890b0'}}>{cur.tasks?.emoji} {cur.tasks?.name}</span>
-                </div>
-              )}
+              {cur?.tasks && <div style={{fontSize:11,color:'#4a5070',marginTop:5,paddingLeft:2}}>Current: <span style={{color:'#8890b0'}}>{cur.tasks?.emoji} {cur.tasks?.name}</span></div>}
             </div>
           )
         })}
@@ -873,7 +883,6 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone }) {
   )
 }
 
-
 function AddTaskForm({ onAdd }) {
   const toast = useToast()
   const [form, setForm] = useState({ name:'', emoji:'📋', description:'', color:'#7DF9AA' })
@@ -883,15 +892,11 @@ function AddTaskForm({ onAdd }) {
     <div style={{background:'#0d0e1a',border:'1px dashed rgba(125,249,170,.2)',borderRadius:13,padding:14,marginTop:4}}>
       <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#7DF9AA',textTransform:'uppercase',marginBottom:13}}>+ Add New Task</div>
       <div style={{display:'flex',gap:9,marginBottom:9}}>
-        <select value={form.emoji} onChange={e=>set('emoji',e.target.value)} style={{...inp,width:70,padding:'9px 5px',textAlign:'center',fontSize:'20px'}}>
-          {EMOJIS.map(em=><option key={em} value={em}>{em}</option>)}
-        </select>
+        <select value={form.emoji} onChange={e=>set('emoji',e.target.value)} style={{...inp,width:70,padding:'9px 5px',textAlign:'center',fontSize:'20px'}}>{EMOJIS.map(em=><option key={em} value={em}>{em}</option>)}</select>
         <input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Task name" style={{...inp,flex:1,padding:'9px 11px'}}/>
       </div>
       <textarea value={form.description} onChange={e=>set('description',e.target.value)} rows={2} placeholder="Description..." style={{...inp,width:'100%',resize:'vertical',marginBottom:9}}/>
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:11}}>
-        {COLORS.map(c=><button key={c} onClick={()=>set('color',c)} style={{width:22,height:22,borderRadius:'50%',background:c,border:`2px solid ${form.color===c?'#fff':'transparent'}`,cursor:'pointer'}}/>)}
-      </div>
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:11}}>{COLORS.map(c=><button key={c} onClick={()=>set('color',c)} style={{width:22,height:22,borderRadius:'50%',background:c,border:`2px solid ${form.color===c?'#fff':'transparent'}`,cursor:'pointer'}}/>)}</div>
       <Btn full loading={loading} onClick={async()=>{
         if(!form.name.trim()){toast('Enter a task name','warn');return}
         setL(true)
@@ -947,9 +952,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
         </div>
         <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:6}}>Maintenance Message</label>
         <textarea value={form.maintenance_message} onChange={e=>set('maintenance_message',e.target.value)} rows={3} style={{...inp,width:'100%',resize:'vertical',fontSize:'14px',lineHeight:1.6}} placeholder="We are performing maintenance. Back soon! 🔧"/>
-        {form.maintenance_mode&&<div style={{marginTop:10,padding:'9px 12px',borderRadius:8,background:'rgba(255,107,107,.1)',border:'1px solid rgba(255,107,107,.2)'}}>
-          <div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Site is in maintenance mode. Only admin can bypass it.</div>
-        </div>}
+        {form.maintenance_mode&&<div style={{marginTop:10,padding:'9px 12px',borderRadius:8,background:'rgba(255,107,107,.1)',border:'1px solid rgba(255,107,107,.2)'}}><div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Site is in maintenance mode. Only admin can bypass it.</div></div>}
       </div>
       <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#7DF9AA',textTransform:'uppercase',marginBottom:12}}>📱 Page Visibility</div>
       <div style={{display:'flex',flexDirection:'column',gap:9,marginBottom:20}}>
@@ -1103,9 +1106,7 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
         <div style={{marginBottom:12}}>
           <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>House Name</label>
-          <input type="text" defaultValue={settings?.house_name||''} placeholder="e.g. Maniyara"
-            onBlur={async e=>{if(e.target.value!==(settings?.house_name||''))await save({house_name:e.target.value})}}
-            style={{...inp,padding:'10px 13px'}}/>
+          <input type="text" defaultValue={settings?.house_name||''} placeholder="e.g. Maniyara" onBlur={async e=>{if(e.target.value!==(settings?.house_name||''))await save({house_name:e.target.value})}} style={{...inp,padding:'10px 13px'}}/>
         </div>
         <div style={{borderTop:'1px solid rgba(255,255,255,.05)',paddingTop:12,display:'flex',alignItems:'center',gap:12}}>
           <div style={{flex:1}}>
@@ -1113,14 +1114,8 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
             <div style={{fontSize:11,color:'#6a7090',lineHeight:1.5}}>When ON, you see who posted each complaint. Members always see Anonymous.</div>
           </div>
           <div onClick={async()=>{try{await save({complaints_reveal_identity:!(settings?.complaints_reveal_identity)})}catch(_){}}}
-            style={{width:52,height:28,borderRadius:99,cursor:'pointer',position:'relative',flexShrink:0,transition:'background .2s',
-              background:settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.08)',
-              border:`2px solid ${settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.12)'}`,
-              boxShadow:settings?.complaints_reveal_identity?'0 0 14px rgba(192,132,252,.35)':'none'}}>
-            <div style={{position:'absolute',top:2,transition:'left .2s',
-              left:settings?.complaints_reveal_identity?24:2,
-              width:20,height:20,borderRadius:'50%',
-              background:settings?.complaints_reveal_identity?'#fff':'rgba(255,255,255,.35)'}}/>
+            style={{width:52,height:28,borderRadius:99,cursor:'pointer',position:'relative',flexShrink:0,transition:'background .2s',background:settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.08)',border:`2px solid ${settings?.complaints_reveal_identity?'#C084FC':'rgba(255,255,255,.12)'}`,boxShadow:settings?.complaints_reveal_identity?'0 0 14px rgba(192,132,252,.35)':'none'}}>
+            <div style={{position:'absolute',top:2,transition:'left .2s',left:settings?.complaints_reveal_identity?24:2,width:20,height:20,borderRadius:'50%',background:settings?.complaints_reveal_identity?'#fff':'rgba(255,255,255,.35)'}}/>
           </div>
         </div>
       </div>
@@ -1144,20 +1139,14 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
       </div>
       <SecHead title="📸 Uploaded Photos"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(255,107,107,.12)',borderRadius:13,padding:14,marginBottom:14}}>
-        {/* Stats row */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:14}}>
-          {[
-            {label:'With Photo',  value:assigns?.filter(a=>a.proof_url)?.length||0, color:'#7DF9AA'},
-            {label:'No Photo',    value:assigns?.filter(a=>a.done&&!a.proof_url)?.length||0, color:'#FF6B6B'},
-          ].map(s=>(
+          {[{label:'With Photo',value:assigns?.filter(a=>a.proof_url)?.length||0,color:'#7DF9AA'},{label:'No Photo',value:assigns?.filter(a=>a.done&&!a.proof_url)?.length||0,color:'#FF6B6B'}].map(s=>(
             <div key={s.label} style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:10,padding:'10px',textAlign:'center'}}>
               <div style={{fontFamily:'Orbitron,monospace',fontSize:20,fontWeight:900,color:s.color}}>{s.value}</div>
               <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginTop:3}}>{s.label}</div>
             </div>
           ))}
         </div>
-
-        {/* Per-member photo delete */}
         <div style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'#8890b0',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Delete by Member</div>
           <div style={{display:'flex',flexDirection:'column',gap:7}}>
@@ -1173,47 +1162,14 @@ function SettingsTab({ settings, week, toast, onDone, members, assigns, tasks })
                     <div style={{fontSize:13,fontWeight:700,color:'#E8F0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m?.name||'Unknown'}</div>
                     <div style={{fontSize:11,color:'#4a5070'}}>{t?.emoji} {t?.name||'Task'}</div>
                   </div>
-                  <button onClick={async()=>{
-                    if(!confirm(`Delete ${m?.name}'s proof photo?`)) return
-                    try {
-                      // Delete from storage if path exists
-                      if(a.proof_path) {
-                        await supabase.storage.from('task-proofs').remove([a.proof_path])
-                      }
-                      // Clear proof fields from assignment
-                      await supabase.from('assignments').update({
-                        proof_url: null, proof_path: null
-                      }).eq('id', a.id)
-                      toast(`${m?.name}'s photo deleted 🗑️`,'warn')
-                      onDone()
-                    } catch(e) { toast('Failed: '+e.message,'error') }
-                  }}
-                    style={{padding:'7px 12px',borderRadius:8,border:'1px solid rgba(255,107,107,.3)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:12,fontWeight:700,flexShrink:0,fontFamily:'Rajdhani,sans-serif'}}>
-                    🗑️ Delete
-                  </button>
+                  <button onClick={async()=>{if(!confirm(`Delete ${m?.name}'s proof photo?`)) return;try{if(a.proof_path){await supabase.storage.from('task-proofs').remove([a.proof_path])}await supabase.from('assignments').update({proof_url:null,proof_path:null}).eq('id',a.id);toast(`${m?.name}'s photo deleted 🗑️`,'warn');onDone()}catch(e){toast('Failed: '+e.message,'error')}}}
+                    style={{padding:'7px 12px',borderRadius:8,border:'1px solid rgba(255,107,107,.3)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:12,fontWeight:700,flexShrink:0,fontFamily:'Rajdhani,sans-serif'}}>🗑️ Delete</button>
                 </div>
               )
             })}
           </div>
         </div>
-
-        {/* Delete all photos */}
-        <Btn variant="danger" full onClick={async()=>{
-          const withPhotos = assigns?.filter(a=>a.proof_url) || []
-          if(withPhotos.length===0) { toast('No photos to delete','warn'); return }
-          if(!confirm(`Delete ALL ${withPhotos.length} proof photos this week?`)) return
-          try {
-            // Delete files from storage
-            const paths = withPhotos.filter(a=>a.proof_path).map(a=>a.proof_path)
-            if(paths.length>0) await supabase.storage.from('task-proofs').remove(paths)
-            // Clear proof fields
-            await Promise.all(withPhotos.map(a=>
-              supabase.from('assignments').update({proof_url:null,proof_path:null}).eq('id',a.id)
-            ))
-            toast(`Deleted ${withPhotos.length} photos 🗑️`,'warn')
-            onDone()
-          } catch(e) { toast('Failed: '+e.message,'error') }
-        }}>☢️ Delete ALL Photos This Week</Btn>
+        <Btn variant="danger" full onClick={async()=>{const withPhotos=assigns?.filter(a=>a.proof_url)||[];if(withPhotos.length===0){toast('No photos to delete','warn');return}if(!confirm(`Delete ALL ${withPhotos.length} proof photos this week?`))return;try{const paths=withPhotos.filter(a=>a.proof_path).map(a=>a.proof_path);if(paths.length>0)await supabase.storage.from('task-proofs').remove(paths);await Promise.all(withPhotos.map(a=>supabase.from('assignments').update({proof_url:null,proof_path:null}).eq('id',a.id)));toast(`Deleted ${withPhotos.length} photos 🗑️`,'warn');onDone()}catch(e){toast('Failed: '+e.message,'error')}}}>☢️ Delete ALL Photos This Week</Btn>
       </div>
       <SecHead title="🔔 App Info"/>
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
