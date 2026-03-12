@@ -7,7 +7,7 @@ import {
   deleteAssignment, getSettings, getMyRole
 } from '../lib/supabase'
 import { Avatar, SecHead, Btn, ToastProvider, useToast, inp } from '../components/UI'
-import { useAutoRotateTimer, AutoRotateTimerWidget } from './AdminPanel'
+import { useAutoRotateTimer, AutoRotateTimerWidget } from './autoRotateTimer'
 
 function TaskAssignerContent() {
   const { user, profile } = useAuth()
