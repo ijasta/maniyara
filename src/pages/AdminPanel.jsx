@@ -1,4 +1,4 @@
-import { useAutoRotateTimer, AutoRotateTimerWidget } from './autoRotateTimer'
+import { useAutoRotateTimer } from './autoRotateTimer'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
@@ -654,31 +654,8 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
         </div>
       </div>
 
-      {/* ── AUTO-ROTATE TIMER ── */}
-      <AutoRotateTimerWidget onRotate={onAutoRotate} />
-
       {/* ── ROTATE SECTION ── */}
-      <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
-        <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
-        <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
-          Last member's task goes to the <strong style={{color:'#E8F0FF'}}>first member</strong>. Everyone else gets the task above. Creates Week <strong style={{color:'#7DF9AA'}}>{week+1}</strong>.
-        </div>
-        {allAssigned&&(
-          <div style={{background:'#0d0e1a',borderRadius:9,padding:12,marginBottom:12}}>
-            <div style={{fontSize:10,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Preview — Week {week+1}:</div>
-            {rotationPreview.map(({member:m,task:t})=>(
-              <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',borderBottom:'1px solid rgba(125,249,170,.05)'}}>
-                <Avatar emoji={m.avatar} color={m.color} size={22}/>
-                <span style={{fontWeight:700,fontSize:12,flex:1}}>{m.name}</span>
-                <span style={{fontSize:12,color:'#4a5070',marginRight:4}}>→</span>
-                <span style={{fontSize:12,color:'#8890b0'}}>{t?`${t.emoji} ${t.name}`:'—'}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <Btn full loading={rotating} variant={allAssigned?'primary':'ghost'} style={{padding:13,fontSize:14,letterSpacing:1}} onClick={doRotate}>🔄 ROTATE → WEEK {week+1}</Btn>
-        {!allAssigned&&<div style={{fontSize:11,color:'#FFD93D',textAlign:'center',marginTop:7}}>⚠️ Assign all members a task first to enable rotate</div>}
-      </div>
+      <RotateSectionWithTimer week={week} onAutoRotate={onAutoRotate} />
 
       <SecHead title="Assign Tasks"/>
       <div style={{fontSize:11,color:'#6a7090',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
@@ -732,6 +709,77 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
         <Btn variant="danger" full onClick={async()=>{if(!confirm(`Delete ALL assignments for Week ${week}?`)) return;try{await clearWeekAssignments(week);toast(`Week ${week} deleted 🗑️`,'warn');onDone()}catch(e){toast('Failed: '+e.message,'error')}}}>🗑️ Delete This Week's Assignments</Btn>
         <Btn variant="danger" full onClick={async()=>{if(!confirm('Delete ALL assignments?')) return;if(!confirm('Final check?')) return;try{await clearAllAssignments();toast('All deleted ☢️','warn');onDone()}catch(e){toast('Failed: '+e.message,'error')}}}>☢️ Delete ALL Assignments</Btn>
       </div>
+    </div>
+  )
+}
+
+// ==========================================
+// AUTO-ROTATE TIMER DISPLAY (no button)
+// ==========================================
+function RotateSectionWithTimer({ week, onAutoRotate }) {
+  const { label, isImminent, timeLeft, nextFriday } = useAutoRotateTimer(onAutoRotate)
+
+  const color     = timeLeft === 0 ? '#7DF9AA' : isImminent ? '#FF6B6B' : '#7DF9AA'
+  const borderCol = timeLeft === 0 ? 'rgba(125,249,170,.35)' : isImminent ? 'rgba(255,107,107,.35)' : 'rgba(125,249,170,.2)'
+  const bg        = timeLeft === 0 ? 'rgba(125,249,170,.07)' : isImminent ? 'rgba(255,107,107,.07)' : 'rgba(125,249,170,.04)'
+  const glow      = isImminent ? `0 0 24px ${timeLeft===0?'rgba(125,249,170,.4)':'rgba(255,107,107,.3)'}` : 'none'
+
+  return (
+    <div style={{
+      background: bg, border:`2px solid ${borderCol}`,
+      borderRadius:13, padding:'14px 18px', marginBottom:16,
+      boxShadow: glow, transition:'all .4s'
+    }}>
+      <style>{`@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+
+      <div style={{display:'flex', alignItems:'center', gap:14}}>
+        {/* Icon */}
+        <div style={{
+          width:48, height:48, borderRadius:12, flexShrink:0,
+          background:`${color}18`, border:`1px solid ${color}35`,
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:24
+        }}>⏰</div>
+
+        {/* Text */}
+        <div style={{flex:1}}>
+          <div style={{fontSize:10, fontWeight:700, color, textTransform:'uppercase', letterSpacing:'.12em', marginBottom:4}}>
+            {timeLeft === 0 ? '🔄 AUTO-ROTATING NOW' : isImminent ? '⚡ ROTATION IMMINENT' : '🔄 AUTO-ROTATION'}
+          </div>
+          <div style={{
+            fontFamily:'Orbitron,monospace', fontSize:26, fontWeight:900,
+            color, letterSpacing:3, lineHeight:1,
+            textShadow:`0 0 20px ${color}55`,
+            animation: isImminent ? 'timerPulse 1s ease-in-out infinite' : 'none'
+          }}>
+            {label}
+          </div>
+          <div style={{fontSize:11, color:'#4a5070', marginTop:5}}>
+            Every Friday 12:00 AM
+            {nextFriday && ` · ${nextFriday.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}`}
+          </div>
+        </div>
+
+        {/* Week badge */}
+        <div style={{
+          textAlign:'center', flexShrink:0,
+          background:'rgba(125,249,170,.06)', border:'1px solid rgba(125,249,170,.15)',
+          borderRadius:10, padding:'8px 12px'
+        }}>
+          <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Next</div>
+          <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#7DF9AA',marginTop:2}}>WK {week+1}</div>
+        </div>
+      </div>
+
+      {timeLeft === 0 && (
+        <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(125,249,170,.1)',border:'1px solid rgba(125,249,170,.25)'}}>
+          <div style={{fontSize:12,color:'#7DF9AA',fontWeight:700}}>✅ Tasks have been rotated to Week {week+1} automatically!</div>
+        </div>
+      )}
+      {isImminent && timeLeft > 0 && (
+        <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(255,107,107,.08)',border:'1px solid rgba(255,107,107,.2)'}}>
+          <div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Rotation fires in under 1 hour — tasks will be assigned to all members automatically.</div>
+        </div>
+      )}
     </div>
   )
 }
