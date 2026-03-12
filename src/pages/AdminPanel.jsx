@@ -1,3 +1,4 @@
+import { useAutoRotateTimer, AutoRotateTimerWidget } from './autoRotateTimer'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
@@ -27,7 +28,7 @@ function getNextFridayMidnight() {
   return next
 }
 
-export function useAutoRotateTimer(onRotate) {
+function useAutoRotateTimer(onRotate) {
   const [timeLeft, setTimeLeft] = useState(null)
   const [nextFriday, setNextFriday] = useState(null)
   const firedRef = useRef(false)
@@ -79,7 +80,7 @@ export function useAutoRotateTimer(onRotate) {
 // ==========================================
 // AUTO-ROTATE TIMER WIDGET (shared component)
 // ==========================================
-export function AutoRotateTimerWidget({ onRotate, compact = false }) {
+function AutoRotateTimerWidget({ onRotate, compact = false }) {
   const { label, isImminent, timeLeft, nextFriday } = useAutoRotateTimer(onRotate)
 
   const color = timeLeft === 0 ? '#7DF9AA' : isImminent ? '#FF6B6B' : '#FFD93D'
