@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import {
   getMembers, getTasks, getCurrentAssignments,
@@ -7,6 +7,7 @@ import {
   deleteAssignment, getSettings, getMyRole
 } from '../lib/supabase'
 import { Avatar, SecHead, Btn, ToastProvider, useToast, inp } from '../components/UI'
+import { useAutoRotateTimer, AutoRotateTimerWidget } from './AdminPanel'
 
 function TaskAssignerContent() {
   const { user, profile } = useAuth()
@@ -20,7 +21,7 @@ function TaskAssignerContent() {
   const [loading,  setL]        = useState(true)
   const [taskMap,  setTaskMap]  = useState({})
   const [saving,   setSaving]   = useState(false)
-  const [autoSaving, setAutoSaving] = useState(null) // member id being auto-saved
+  const [autoSaving, setAutoSaving] = useState(null)
   const [rotating, setRotating] = useState(false)
 
   useEffect(() => { load() }, [user])
@@ -68,6 +69,22 @@ function TaskAssignerContent() {
     } catch(e) { toast('Failed: '+e.message,'error') }
     finally { setSaving(false) }
   }
+
+  // Auto-rotate handler — fires automatically when Friday 12AM hits
+  const handleAutoRotate = useCallback(async () => {
+    const allAssigned = members.every(m => assigns.find(a => a.member_id === m.id || a.members?.id === m.id))
+    if (!allAssigned) {
+      toast('⚠️ Auto-rotation skipped: not all members have tasks','warn')
+      return
+    }
+    try {
+      const newWeek = await rotateToNextWeek()
+      toast(`🔄 Auto-rotated to Week ${newWeek}! (Friday 12:00 AM)`)
+      load()
+    } catch(e) {
+      toast('Auto-rotation failed: '+e.message,'error')
+    }
+  }, [members, assigns])
 
   const canAccess = profile?.is_admin || role?.isAssigner
   const activeTasks = tasks.filter(t => t.active)
@@ -144,7 +161,10 @@ function TaskAssignerContent() {
         </div>
       </div>
 
-      {/* ── ROTATE SECTION (TOP) ── */}
+      {/* ── AUTO-ROTATE TIMER WIDGET ── */}
+      <AutoRotateTimerWidget onRotate={handleAutoRotate} />
+
+      {/* ── ROTATE SECTION ── */}
       <div style={{background:'rgba(125,249,170,.04)',border:'2px solid rgba(125,249,170,.18)',borderRadius:13,padding:16,marginBottom:16}}>
         <div style={{fontFamily:'Orbitron,monospace',fontSize:12,fontWeight:700,letterSpacing:2,color:'#7DF9AA',marginBottom:6}}>🔄 ROTATE TO NEXT WEEK</div>
         <div style={{fontSize:12,color:'#8890b0',lineHeight:1.6,marginBottom:12}}>
@@ -200,7 +220,6 @@ function TaskAssignerContent() {
                   <div style={{fontWeight:700,fontSize:14}}>{m.name}</div>
                   {m.username && <div style={{fontSize:11,color:'#4a5070'}}>@{m.username}</div>}
                 </div>
-                {/* Status badge */}
                 {isSaving ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(77,150,255,.1)',border:'1px solid rgba(77,150,255,.25)',color:'#4D96FF'}}>
                     💾 Saving...
@@ -247,7 +266,6 @@ function TaskAssignerContent() {
           )
         })}
 
-        {/* Save All button — fallback */}
         <button onClick={saveAssignments} disabled={saving}
           style={{width:'100%',padding:13,borderRadius:11,fontFamily:'Rajdhani,sans-serif',fontWeight:800,fontSize:14,cursor:'pointer',border:'1px solid rgba(125,249,170,.2)',marginTop:4,
             background:saving?'#1a2030':'rgba(125,249,170,.08)',
