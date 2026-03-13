@@ -58,17 +58,31 @@ const CSS = `
   .filter-tab.active-done   { background:${T.greenDim};  color:${T.green};  }
   .filter-tab.active-pending{ background:${T.redDim};    color:${T.red};    }
 
-  .member-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .member-grid { display:flex; flex-direction:column; gap:8px; }
   .member-card {
-    border-radius:16px; border:1px solid ${T.border};
+    border-radius:14px; border:1px solid ${T.border};
     background:${T.surface}; overflow:hidden; position:relative;
-    animation:fadeUp .35s ease both;
-    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    animation:fadeUp .3s ease both; cursor:pointer;
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   }
-  .member-card:hover { transform:translateY(-3px); box-shadow:0 14px 36px rgba(0,0,0,.45); }
-  .member-card.mc-done { border-color:rgba(52,211,153,.28); }
-  .member-card.mc-pend { border-color:rgba(248,113,113,.18); }
+  .member-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.4); border-color:${T.borderHi}; }
+  .member-card:active { transform:scale(.985); }
+  .member-card.mc-done { border-color:rgba(52,211,153,.25); }
+  .member-card.mc-pend { border-color:rgba(248,113,113,.16); }
   .check-badge { animation:checkPop .3s ease both; }
+
+  .member-modal-bg {
+    position:fixed; inset:0; z-index:9998;
+    background:rgba(2,4,12,.88); backdrop-filter:blur(18px) saturate(.4);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; animation:fadeIn .18s ease;
+  }
+  .member-modal {
+    background:#0e1128; border:1px solid ${T.borderHi};
+    border-radius:22px; width:100%; max-width:360px;
+    overflow:hidden; animation:fadeUp .2s ease;
+    box-shadow:0 32px 80px rgba(0,0,0,.7);
+  }
 
   .progress-track { height:5px; border-radius:99px; background:rgba(255,255,255,.05); overflow:hidden; }
   .progress-fill  { height:100%; border-radius:99px; animation:grow .9s cubic-bezier(.4,0,.2,1) both; }
@@ -160,7 +174,7 @@ function DashContent() {
   const [showSheet,  setSheet]    = useState(false)
   const [cMsg,       setCMsg]     = useState('')
   const [cSubmit,    setCSub]     = useState(false)
-  const [showAll,    setShowAll]  = useState(false)
+  const [selectedMember, setSelectedMember] = useState(null)
   const [cSettings,  setCSt]     = useState(null)
 
   useEffect(() => { load() }, [])
@@ -355,14 +369,12 @@ function DashContent() {
       </div>
 
 
-      {/* Member cards grid */}
+      {/* Member cards */}
       {filtered.length===0 ? (
         <div style={{textAlign:'center',padding:'40px 20px',animation:'fadeUp .3s ease'}}>
           <div style={{fontSize:32,marginBottom:10}}>🎉</div>
           <div style={{fontSize:13,fontWeight:600,color:T.t2,marginBottom:4}}>All clear</div>
-          <div style={{fontSize:12,color:T.t3}}>
-            {filter==='pending'?'Everyone completed their task!':'No members found.'}
-          </div>
+          <div style={{fontSize:12,color:T.t3}}>{filter==='pending'?'Everyone completed their task!':'No members found.'}</div>
         </div>
       ) : (
         <div className="member-grid" style={{marginBottom:4}}>
@@ -370,102 +382,80 @@ function DashContent() {
             const a      = assigns.find(x => x.member_id===m.id || x.members?.id===m.id)
             const t      = a?.tasks
             const isDone = a?.done
-            const mColor = m.color || (isDone ? T.green : T.purple)
+            const mColor = m.color || T.purple
 
             return (
               <div key={m.id}
                 className={`member-card ${isDone ? 'mc-done' : 'mc-pend'}`}
-                style={{animationDelay:`${idx*.05}s`}}
+                style={{animationDelay:`${idx*.04}s`}}
+                onClick={()=>setSelectedMember({m,a,t,isDone,mColor})}
               >
-                {/* Colour wash — thin, top only */}
+                {/* Left accent bar */}
                 <div style={{
-                  position:'absolute',top:0,left:0,right:0,height:3,
+                  position:'absolute',left:0,top:0,bottom:0,width:3,
                   background: isDone
-                    ? `linear-gradient(90deg,${T.green},rgba(52,211,153,.2))`
-                    : `linear-gradient(90deg,${mColor},rgba(0,0,0,0))`,
-                  opacity:.9
+                    ? `linear-gradient(180deg,${T.green},rgba(52,211,153,.1))`
+                    : `linear-gradient(180deg,${mColor},rgba(0,0,0,0))`
                 }}/>
 
-                <div style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:10}}>
+                <div style={{padding:'12px 14px 12px 18px',display:'flex',alignItems:'center',gap:12}}>
 
-                  {/* Avatar — compact */}
+                  {/* Avatar */}
                   <div style={{position:'relative',flexShrink:0}}>
                     <div style={{
-                      width:40,height:40,borderRadius:'50%',
-                      background:`${mColor}18`,
-                      border:`2px solid ${isDone ? T.green+'66' : mColor+'44'}`,
-                      display:'flex',alignItems:'center',justifyContent:'center',
-                      fontSize:20
+                      width:44,height:44,borderRadius:'50%',
+                      background:`${mColor}20`,
+                      border:`2px solid ${isDone ? T.green+'55' : mColor+'40'}`,
+                      display:'flex',alignItems:'center',justifyContent:'center',fontSize:22
                     }}>{m.avatar||'👤'}</div>
-
-                    {/* Status dot */}
                     <div style={{
                       position:'absolute',bottom:0,right:0,
-                      width:13,height:13,borderRadius:'50%',
+                      width:15,height:15,borderRadius:'50%',
                       background: isDone ? T.green : T.red,
                       border:`2px solid ${T.surface}`,
                       display:'flex',alignItems:'center',justifyContent:'center',
-                      fontSize:6,fontWeight:900,color:'#000'
-                    }}>{isDone ? '✓' : '!'}</div>
+                      fontSize:7,fontWeight:900,color:'#000'
+                    }}>{isDone?'✓':'!'}</div>
                   </div>
 
-                  {/* Info — name + task */}
+                  {/* Name + task */}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{
-                      fontSize:12,fontWeight:700,color:T.t1,
-                      marginBottom:5,lineHeight:1.2,
-                      wordBreak:'break-word'
+                      fontSize:15,fontWeight:800,color:T.t1,
+                      letterSpacing:-.3,lineHeight:1,marginBottom:7,
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
                     }}>{m.name}</div>
-
                     {t ? (
                       <div style={{
-                        display:'flex',alignItems:'center',gap:5,
-                        padding:'3px 8px',borderRadius:7,
-                        background: isDone ? T.greenDim : 'rgba(255,255,255,.04)',
+                        display:'inline-flex',alignItems:'center',gap:5,
+                        padding:'3px 9px',borderRadius:7,
+                        background: isDone ? T.greenDim : 'rgba(255,255,255,.05)',
                         border:`1px solid ${isDone ? T.greenBdr : T.border}`,
+                        maxWidth:'100%',overflow:'hidden'
                       }}>
-                        <span style={{fontSize:12,flexShrink:0,lineHeight:1}}>{t.emoji}</span>
+                        <span style={{fontSize:12,flexShrink:0}}>{t.emoji}</span>
                         <span style={{
-                          fontSize:10,fontWeight:600,
+                          fontSize:11,fontWeight:600,
                           color: isDone ? T.green : T.t2,
                           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
                         }}>{t.name}</span>
                       </div>
                     ) : (
-                      <div style={{
-                        padding:'3px 8px',borderRadius:7,
-                        background:'rgba(255,255,255,.03)',border:`1px solid ${T.border}`,
-                        fontSize:10,color:T.t4,fontStyle:'italic'
-                      }}>Unassigned</div>
+                      <span style={{fontSize:11,color:T.t4,fontStyle:'italic'}}>No task assigned</span>
                     )}
                   </div>
 
-                  {/* Right — status badge only (proof/time below) */}
+                  {/* Status + tap hint */}
                   <div style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:5}}>
                     <div style={{
-                      fontSize:9,fontWeight:700,padding:'3px 7px',borderRadius:6,
+                      fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,
                       background: isDone ? T.greenDim : T.redDim,
                       border:`1px solid ${isDone ? T.greenBdr : T.redBdr}`,
-                      color: isDone ? T.green : T.red,
-                      whiteSpace:'nowrap'
+                      color: isDone ? T.green : T.red,whiteSpace:'nowrap'
                     }}>{isDone ? '✓ Done' : 'Pending'}</div>
-
-                    {a?.proof_url && (
-                      <button onClick={()=>openPhoto(a.proof_url)} style={{
-                        padding:'2px 7px',borderRadius:6,
-                        background:T.greenDim,border:`1px solid ${T.greenBdr}`,
-                        color:T.green,fontSize:9,fontWeight:600
-                      }}>📷</button>
-                    )}
-
-                    {a?.done_at && (
-                      <div style={{
-                        fontSize:8,color:T.t4,
-                        fontFamily:'JetBrains Mono,monospace',textAlign:'right',lineHeight:1.3
-                      }}>
-                        {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
-                      </div>
-                    )}
+                    <div style={{fontSize:9,color:T.t4,letterSpacing:.2}}>
+                      {a?.proof_url ? '📷 has proof' : 'tap to view'}
+                    </div>
                   </div>
 
                 </div>
@@ -474,6 +464,104 @@ function DashContent() {
           })}
         </div>
       )}
+
+      {/* ── Member detail modal ── */}
+      {selectedMember && (() => {
+        const {m, a, t, isDone, mColor} = selectedMember
+        return (
+          <div className="member-modal-bg" onClick={()=>setSelectedMember(null)}>
+            <div className="member-modal" onClick={e=>e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{
+                position:'relative',overflow:'hidden',
+                padding:'22px 20px 18px',
+                background:`linear-gradient(135deg,${mColor}18,rgba(0,0,0,0))`,
+                borderBottom:`1px solid ${T.border}`
+              }}>
+                <div style={{position:'absolute',top:-30,right:-30,width:120,height:120,borderRadius:'50%',
+                  background:`radial-gradient(circle,${mColor}22,transparent 70%)`,pointerEvents:'none'}}/>
+                <button onClick={()=>setSelectedMember(null)} style={{
+                  position:'absolute',top:14,right:14,width:28,height:28,borderRadius:'50%',
+                  background:'rgba(255,255,255,.07)',border:`1px solid ${T.border}`,
+                  color:T.t2,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700
+                }}>✕</button>
+                <div style={{display:'flex',alignItems:'center',gap:14,position:'relative'}}>
+                  <div style={{
+                    width:62,height:62,borderRadius:'50%',flexShrink:0,
+                    background:`${mColor}25`,
+                    border:`2.5px solid ${isDone ? T.green : mColor}60`,
+                    display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,
+                    boxShadow:`0 0 24px ${isDone ? 'rgba(52,211,153,.2)' : mColor+'22'}`
+                  }}>{m.avatar||'👤'}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:20,fontWeight:800,color:T.t1,letterSpacing:-.4,lineHeight:1.1,marginBottom:4}}>{m.name}</div>
+                    {m.username && <div style={{fontSize:12,color:T.t3,marginBottom:8}}>@{m.username}</div>}
+                    <span style={{
+                      fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6,
+                      background: isDone ? T.greenDim : T.redDim,
+                      border:`1px solid ${isDone ? T.greenBdr : T.redBdr}`,
+                      color: isDone ? T.green : T.red
+                    }}>{isDone ? '✓ Done' : '⏳ Pending'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Task */}
+              <div style={{padding:'16px 20px',borderBottom:`1px solid ${T.border}`}}>
+                <div style={{fontSize:10,fontWeight:700,color:T.t4,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>This week's task</div>
+                {t ? (
+                  <div style={{
+                    display:'flex',alignItems:'center',gap:12,
+                    padding:'12px 14px',borderRadius:12,
+                    background: isDone ? T.greenDim : 'rgba(255,255,255,.04)',
+                    border:`1px solid ${isDone ? T.greenBdr : T.border}`
+                  }}>
+                    <span style={{fontSize:26,flexShrink:0}}>{t.emoji}</span>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color: isDone ? T.green : T.t1}}>{t.name}</div>
+                      {a?.done_at && <div style={{fontSize:11,color:T.t3,marginTop:3}}>
+                        Completed {new Date(a.done_at).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+                      </div>}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{fontSize:13,color:T.t4,fontStyle:'italic'}}>No task assigned yet</div>
+                )}
+              </div>
+
+              {/* Proof */}
+              <div style={{padding:'16px 20px 20px'}}>
+                <div style={{fontSize:10,fontWeight:700,color:T.t4,textTransform:'uppercase',letterSpacing:.1,marginBottom:12}}>Proof photo</div>
+                {a?.proof_url ? (
+                  <>
+                    <img src={a.proof_url} alt="Proof"
+                      onClick={()=>{ setSelectedMember(null); openPhoto(a.proof_url) }}
+                      style={{width:'100%',borderRadius:12,objectFit:'cover',maxHeight:200,
+                        display:'block',cursor:'zoom-in',border:`1px solid ${T.border}`}}
+                      onError={e=>e.target.style.display='none'}/>
+                    <button onClick={()=>{ setSelectedMember(null); openPhoto(a.proof_url) }} style={{
+                      marginTop:10,width:'100%',padding:'10px',borderRadius:10,
+                      background:T.greenDim,border:`1px solid ${T.greenBdr}`,
+                      color:T.green,fontSize:13,fontWeight:700
+                    }}>View full photo →</button>
+                  </>
+                ) : (
+                  <div style={{
+                    padding:'24px 16px',borderRadius:12,textAlign:'center',
+                    background:'rgba(255,255,255,.03)',border:`1px solid ${T.border}`
+                  }}>
+                    <div style={{fontSize:28,marginBottom:8}}>📷</div>
+                    <div style={{fontSize:12,color:T.t4}}>{isDone ? 'No photo uploaded' : 'Task not completed yet'}</div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )
+      })()}
+
 
       {/* ══════ COMPLAINTS ══════ */}
       <div style={{marginTop:32,marginBottom:18}}>
