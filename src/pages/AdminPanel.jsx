@@ -2,6 +2,7 @@ import { useAutoRotateTimer } from './autoRotateTimer'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
+  saveMemberOrder,
   getTasks, addTask, updateTask, deleteTask,
   getCurrentAssignments, adminAssignTasks, rotateToNextWeek, deleteAssignment,
   getSettings, updateSettings, getLogs, buildWALink,
@@ -595,22 +596,18 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
   const approvedBase = members.filter(m => m.status === 'approved')
   const activeTasks  = tasks.filter(t => t.active)
 
-  // ── Member order — persisted in localStorage ──
-  const ORDER_KEY = 'maniyara_member_order'
-  const [orderedIds, setOrderedIds] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]')
-      // Merge: keep saved order, append any new members at the end
-      const known = saved.filter(id => approvedBase.find(m => m.id === id))
-      const newOnes = approvedBase.filter(m => !known.includes(m.id)).map(m => m.id)
-      return [...known, ...newOnes]
-    } catch { return approvedBase.map(m => m.id) }
-  })
+  // ── Member order — driven by sort_order from DB (set by admin) ──
+  // members prop already arrives sorted by sort_order via getMembers()
+  // We keep a local copy for instant UI reordering before saving
+  const [orderedIds, setOrderedIds] = useState(() =>
+    approvedBase.map(m => m.id)
+  )
+  const [orderSaving, setOrderSaving] = useState(false)
 
-  // Keep orderedIds in sync if members prop changes (approval / removal)
+  // Stay in sync when members prop changes (new approvals etc.)
   useEffect(() => {
     setOrderedIds(prev => {
-      const known  = prev.filter(id => approvedBase.find(m => m.id === id))
+      const known   = prev.filter(id => approvedBase.find(m => m.id === id))
       const newOnes = approvedBase.filter(m => !known.includes(m.id)).map(m => m.id)
       return [...known, ...newOnes]
     })
@@ -618,9 +615,18 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
 
   const approved = orderedIds.map(id => approvedBase.find(m => m.id === id)).filter(Boolean)
 
-  const persistOrder = (ids) => {
+  // Save order to Supabase so every page + rotation uses it
+  const persistOrder = async (ids) => {
     setOrderedIds(ids)
-    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)) } catch {}
+    setOrderSaving(true)
+    try {
+      await saveMemberOrder(ids)
+      toast('Order saved ✅')
+    } catch(e) {
+      toast('Failed to save order: ' + e.message, 'error')
+    } finally {
+      setOrderSaving(false)
+    }
   }
 
   const moveUp = (idx) => {
@@ -638,8 +644,8 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
   }
 
   // Drag state
-  const [dragIdx,   setDragIdx]   = useState(null)
-  const [dragOver,  setDragOver]  = useState(null)
+  const [dragIdx,    setDragIdx]    = useState(null)
+  const [dragOver,   setDragOver]   = useState(null)
   const [reordering, setReordering] = useState(false)
 
   const onDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }
@@ -736,7 +742,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
           color: reordering ? '#FFD93D' : '#7DF9AA',
           transition:'all .15s'
         }}>
-          {reordering ? '✓ Done' : '⇅ Reorder'}
+          {orderSaving ? '💾 Saving...' : reordering ? '✓ Done' : '⇅ Reorder'}
         </button>
       </div>
 
@@ -749,7 +755,7 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
           display:'flex',alignItems:'center',gap:7
         }}>
           <span style={{fontSize:14}}>☝️</span>
-          Drag rows or use ↑ ↓ buttons to set the rotation order. Order is saved automatically.
+          Drag rows or use ↑ ↓ to reorder. Order saves to the server instantly — updates homepage, rotation preview, and auto-rotate for everyone.
         </div>
       )}
 
