@@ -162,7 +162,7 @@ function TaskAssignerContent() {
       </div>
 
       {/* ── ROTATE SECTION WITH TIMER ── */}
-      <TaskAssignerRotateSection week={week} onAutoRotate={handleAutoRotate} />
+      <TaskAssignerRotateSection week={week} onAutoRotate={handleAutoRotate} rotationPreview={rotationPreview} allAssigned={allAssigned} />
 
       {/* ── ASSIGN DROPDOWNS ── */}
       <SecHead title="Assign Tasks to Each Member"/>
@@ -267,65 +267,133 @@ function TaskAssignerContent() {
 // ==========================================
 // AUTO-ROTATE TIMER DISPLAY (no button)
 // ==========================================
-function TaskAssignerRotateSection({ week, onAutoRotate }) {
+function TaskAssignerRotateSection({ week, onAutoRotate, rotationPreview = [], allAssigned }) {
   const { label, isImminent, timeLeft, nextFriday } = useAutoRotateTimer(onAutoRotate)
+  const [showPreview, setShowPreview] = useState(false)
 
   const color     = timeLeft === 0 ? '#7DF9AA' : isImminent ? '#FF6B6B' : '#7DF9AA'
   const borderCol = timeLeft === 0 ? 'rgba(125,249,170,.35)' : isImminent ? 'rgba(255,107,107,.35)' : 'rgba(125,249,170,.2)'
   const bg        = timeLeft === 0 ? 'rgba(125,249,170,.07)' : isImminent ? 'rgba(255,107,107,.07)' : 'rgba(125,249,170,.04)'
   const glow      = isImminent ? `0 0 24px ${timeLeft===0?'rgba(125,249,170,.4)':'rgba(255,107,107,.3)'}` : 'none'
 
+  const hasPreview = rotationPreview.length > 0 && allAssigned
+
   return (
     <div style={{
       background: bg, border:`2px solid ${borderCol}`,
-      borderRadius:13, padding:'14px 18px', marginBottom:16,
-      boxShadow: glow, transition:'all .4s'
+      borderRadius:13, marginBottom:16,
+      boxShadow: glow, transition:'all .4s', overflow:'hidden'
     }}>
-      <style>{`@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+      <style>{`
+        @keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.4}}
+        @keyframes previewIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+      `}</style>
 
-      <div style={{display:'flex', alignItems:'center', gap:14}}>
-        <div style={{
-          width:48, height:48, borderRadius:12, flexShrink:0,
-          background:`${color}18`, border:`1px solid ${color}35`,
-          display:'flex', alignItems:'center', justifyContent:'center', fontSize:24
-        }}>⏰</div>
-
-        <div style={{flex:1}}>
-          <div style={{fontSize:10, fontWeight:700, color, textTransform:'uppercase', letterSpacing:'.12em', marginBottom:4}}>
-            {timeLeft === 0 ? '🔄 AUTO-ROTATING NOW' : isImminent ? '⚡ ROTATION IMMINENT' : '🔄 AUTO-ROTATION'}
-          </div>
+      <div style={{padding:'14px 18px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:14}}>
           <div style={{
-            fontFamily:'Orbitron,monospace', fontSize:26, fontWeight:900,
-            color, letterSpacing:3, lineHeight:1,
-            textShadow:`0 0 20px ${color}55`,
-            animation: isImminent ? 'timerPulse 1s ease-in-out infinite' : 'none'
-          }}>
-            {label}
+            width:48, height:48, borderRadius:12, flexShrink:0,
+            background:`${color}18`, border:`1px solid ${color}35`,
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:24
+          }}>⏰</div>
+
+          <div style={{flex:1}}>
+            <div style={{fontSize:10, fontWeight:700, color, textTransform:'uppercase', letterSpacing:'.12em', marginBottom:4}}>
+              {timeLeft === 0 ? '🔄 AUTO-ROTATING NOW' : isImminent ? '⚡ ROTATION IMMINENT' : '🔄 AUTO-ROTATION'}
+            </div>
+            <div style={{
+              fontFamily:'Orbitron,monospace', fontSize:26, fontWeight:900,
+              color, letterSpacing:3, lineHeight:1,
+              textShadow:`0 0 20px ${color}55`,
+              animation: isImminent ? 'timerPulse 1s ease-in-out infinite' : 'none'
+            }}>
+              {label}
+            </div>
+            <div style={{fontSize:11, color:'#4a5070', marginTop:5}}>
+              Every Friday 12:00 AM
+              {nextFriday && ` · ${nextFriday.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}`}
+            </div>
           </div>
-          <div style={{fontSize:11, color:'#4a5070', marginTop:5}}>
-            Every Friday 12:00 AM
-            {nextFriday && ` · ${nextFriday.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}`}
+
+          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0}}>
+            <div style={{
+              textAlign:'center',
+              background:'rgba(125,249,170,.06)', border:'1px solid rgba(125,249,170,.15)',
+              borderRadius:10, padding:'6px 12px'
+            }}>
+              <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Next</div>
+              <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#7DF9AA',marginTop:1}}>WK {week+1}</div>
+            </div>
+            {hasPreview && (
+              <button onClick={() => setShowPreview(p => !p)} style={{
+                fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:99,
+                border:`1px solid ${color}40`, background:`${color}10`,
+                color, cursor:'pointer', letterSpacing:'.05em',
+                transition:'all .15s', whiteSpace:'nowrap'
+              }}>
+                {showPreview ? '▲ Hide' : '▼ Preview'}
+              </button>
+            )}
+            {!hasPreview && rotationPreview.length > 0 && !allAssigned && (
+              <div style={{fontSize:9,color:'#4a5070',textAlign:'center',maxWidth:70}}>Assign all to see preview</div>
+            )}
           </div>
         </div>
 
-        <div style={{
-          textAlign:'center', flexShrink:0,
-          background:'rgba(125,249,170,.06)', border:'1px solid rgba(125,249,170,.15)',
-          borderRadius:10, padding:'8px 12px'
-        }}>
-          <div style={{fontSize:9,color:'#4a5070',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'}}>Next</div>
-          <div style={{fontFamily:'Orbitron,monospace',fontSize:16,fontWeight:900,color:'#7DF9AA',marginTop:2}}>WK {week+1}</div>
-        </div>
+        {timeLeft === 0 && (
+          <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(125,249,170,.1)',border:'1px solid rgba(125,249,170,.25)'}}>
+            <div style={{fontSize:12,color:'#7DF9AA',fontWeight:700}}>✅ Tasks rotated to Week {week+1} automatically!</div>
+          </div>
+        )}
+        {isImminent && timeLeft > 0 && (
+          <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(255,107,107,.08)',border:'1px solid rgba(255,107,107,.2)'}}>
+            <div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Rotation fires in under 1 hour — assignments will update automatically.</div>
+          </div>
+        )}
       </div>
 
-      {timeLeft === 0 && (
-        <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(125,249,170,.1)',border:'1px solid rgba(125,249,170,.25)'}}>
-          <div style={{fontSize:12,color:'#7DF9AA',fontWeight:700}}>✅ Tasks have been rotated to Week {week+1} automatically!</div>
-        </div>
-      )}
-      {isImminent && timeLeft > 0 && (
-        <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,background:'rgba(255,107,107,.08)',border:'1px solid rgba(255,107,107,.2)'}}>
-          <div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Rotation fires in under 1 hour — tasks will be assigned automatically.</div>
+      {showPreview && hasPreview && (
+        <div style={{
+          borderTop:`1px solid ${borderCol}`,
+          background:'rgba(0,0,0,.25)',
+          padding:'12px 18px 14px',
+          animation:'previewIn .2s ease'
+        }}>
+          <div style={{
+            fontSize:10, fontWeight:700, letterSpacing:'.12em',
+            textTransform:'uppercase', color:'#4a5070', marginBottom:10,
+            display:'flex', alignItems:'center', gap:6
+          }}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:'#7DF9AA',display:'inline-block'}}/>
+            Week {week+1} — What happens after rotation
+          </div>
+
+          {rotationPreview.map(({ member: m, task: t }, idx) => (
+            <div key={m.id} style={{
+              display:'flex', alignItems:'center', gap:10,
+              padding:'7px 0',
+              borderBottom: idx < rotationPreview.length - 1 ? '1px solid rgba(125,249,170,.06)' : 'none'
+            }}>
+              <Avatar emoji={m.avatar} color={m.color} size={28}/>
+              <span style={{
+                fontSize:13, fontWeight:700, color:'#E8F0FF',
+                minWidth:90, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+              }}>{m.name}</span>
+              <span style={{fontSize:11, color:'#3a4060', flexShrink:0}}>→</span>
+              {t ? (
+                <div style={{
+                  display:'flex', alignItems:'center', gap:5, flex:1,
+                  background:'rgba(125,249,170,.06)', border:'1px solid rgba(125,249,170,.12)',
+                  borderRadius:99, padding:'4px 10px', minWidth:0
+                }}>
+                  <span style={{fontSize:14, flexShrink:0}}>{t.emoji}</span>
+                  <span style={{fontSize:12, color:'#8890b0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{t.name}</span>
+                </div>
+              ) : (
+                <span style={{fontSize:11,color:'#3a4060',fontStyle:'italic'}}>—</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
