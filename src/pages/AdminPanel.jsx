@@ -867,14 +867,14 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
 // ==========================================
 function RotateSectionWithTimer({ week, onAutoRotate, rotationPreview = [], allAssigned }) {
   const { label, isImminent, timeLeft, nextFriday } = useAutoRotateTimer(onAutoRotate)
-  const [showPreview, setShowPreview] = useState(false)
+  const [showPreview, setShowPreview] = useState(true)
 
   const color     = timeLeft === 0 ? '#7DF9AA' : isImminent ? '#FF6B6B' : '#7DF9AA'
   const borderCol = timeLeft === 0 ? 'rgba(125,249,170,.35)' : isImminent ? 'rgba(255,107,107,.35)' : 'rgba(125,249,170,.2)'
   const bg        = timeLeft === 0 ? 'rgba(125,249,170,.07)' : isImminent ? 'rgba(255,107,107,.07)' : 'rgba(125,249,170,.04)'
   const glow      = isImminent ? `0 0 24px ${timeLeft===0?'rgba(125,249,170,.4)':'rgba(255,107,107,.3)'}` : 'none'
 
-  const hasPreview = rotationPreview.length > 0 && allAssigned
+  const hasPreview = rotationPreview.length > 0
 
   return (
     <div style={{
@@ -938,9 +938,6 @@ function RotateSectionWithTimer({ week, onAutoRotate, rotationPreview = [], allA
                 {showPreview ? '▲ Hide' : '▼ Preview'}
               </button>
             )}
-            {!hasPreview && rotationPreview.length > 0 && !allAssigned && (
-              <div style={{fontSize:9,color:'#4a5070',textAlign:'center',maxWidth:70}}>Assign all to see preview</div>
-            )}
           </div>
         </div>
 
@@ -971,7 +968,8 @@ function RotateSectionWithTimer({ week, onAutoRotate, rotationPreview = [], allA
             display:'flex', alignItems:'center', gap:6
           }}>
             <span style={{width:6,height:6,borderRadius:'50%',background:'#7DF9AA',display:'inline-block'}}/>
-            Week {week+1} — What happens after rotation
+            Week {week+1} — Preview after rotation
+            {!allAssigned && <span style={{color:'#FFD93D',fontWeight:700,marginLeft:4}}>· assign all tasks to see full preview</span>}
           </div>
 
           {rotationPreview.map(({ member: m, task: t }, idx) => (
@@ -981,19 +979,12 @@ function RotateSectionWithTimer({ week, onAutoRotate, rotationPreview = [], allA
               borderBottom: idx < rotationPreview.length - 1
                 ? '1px solid rgba(125,249,170,.06)' : 'none'
             }}>
-              {/* Avatar */}
               <Avatar emoji={m.avatar} color={m.color} size={28}/>
-
-              {/* Name */}
               <span style={{
                 fontSize:13, fontWeight:700, color:'#E8F0FF',
-                minWidth:90, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+                minWidth:80, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:'0 0 auto'
               }}>{m.name}</span>
-
-              {/* Arrow */}
               <span style={{fontSize:11, color:'#3a4060', flexShrink:0}}>→</span>
-
-              {/* Task pill */}
               {t ? (
                 <div style={{
                   display:'flex', alignItems:'center', gap:5, flex:1,
@@ -1001,13 +992,16 @@ function RotateSectionWithTimer({ week, onAutoRotate, rotationPreview = [], allA
                   borderRadius:99, padding:'4px 10px', minWidth:0
                 }}>
                   <span style={{fontSize:14, flexShrink:0}}>{t.emoji}</span>
-                  <span style={{
-                    fontSize:12, color:'#8890b0',
-                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
-                  }}>{t.name}</span>
+                  <span style={{fontSize:12, color:'#8890b0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{t.name}</span>
                 </div>
               ) : (
-                <span style={{fontSize:11,color:'#3a4060',fontStyle:'italic'}}>—</span>
+                <div style={{
+                  display:'flex', alignItems:'center', gap:5, flex:1,
+                  background:'rgba(255,107,107,.05)', border:'1px solid rgba(255,107,107,.12)',
+                  borderRadius:99, padding:'4px 10px'
+                }}>
+                  <span style={{fontSize:11, color:'#4a3030', fontStyle:'italic'}}>No task assigned yet</span>
+                </div>
               )}
             </div>
           ))}
