@@ -4,8 +4,6 @@ const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const PROXY_URL         = import.meta.env.VITE_SUPABASE_PROXY_URL
 
-// Simple reliable proxy — rewrites supabase.co calls through Cloudflare Worker
-// Fixes Jio mobile data blocking of supabase.co
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   ...(PROXY_URL ? {
     global: {
@@ -14,7 +12,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         if (PROXY_URL && urlStr.includes('supabase.co')) {
           const proxied = urlStr.replace(SUPABASE_URL, PROXY_URL)
           const newOptions = { ...options }
-          // Preserve headers but ensure apikey is always sent
           if (newOptions.headers) {
             if (newOptions.headers instanceof Headers) {
               newOptions.headers = Object.fromEntries(newOptions.headers.entries())
@@ -30,6 +27,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     }
   } : {})
 })
+
 export const COLORS  = ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#C77DFF','#FF9A3C','#00D4AA']
 export const AVATARS = ['🧔','👦','🧑','👨','🙍','🧒','👩','🧕','👱','🧑‍🦱']
 
@@ -48,7 +46,7 @@ export async function signUp(email, password, name, username, phone) {
       score:    0,
       streak:   0,
       is_admin: false,
-      status:   'pending',   // ← admin must approve before they can enter
+      status:   'pending',
       color:    COLORS[Math.floor(Math.random() * COLORS.length)],
       avatar:   AVATARS[Math.floor(Math.random() * AVATARS.length)],
     })
@@ -75,9 +73,10 @@ export async function getMemberProfile(userId) {
   return data
 }
 
+// ✅ FIX: Use created_at order everywhere so screen and rotation always match
 export async function getMembers() {
   const { data, error } = await supabase
-    .from('members').select('*').order('score', { ascending: false })
+    .from('members').select('*').order('created_at', { ascending: true })
   if (error) throw error
   return data
 }
@@ -184,14 +183,10 @@ export async function markTaskDone(assignmentId, memberId, proofFile) {
 }
 
 // ── ASSIGN & ROTATE ───────────────────────────────────────
-
-// Admin assigns tasks to members for current week
-// assigns = [{ member_id, task_id }]
 export async function adminAssignTasks(assigns) {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
   const week = s?.current_week || 1
 
-  // Upsert each member individually so other members' tasks are never deleted
   for (const a of assigns) {
     const { data: existing } = await supabase
       .from('assignments')
@@ -218,7 +213,8 @@ export async function adminAssignTasks(assigns) {
   return week
 }
 
-// Admin clicks Rotate — shifts tasks UP the list, new week
+// ✅ FIX: Both getMembers() and rotateToNextWeek() now use created_at order
+//         so the rotation always matches exactly what's shown on screen.
 export async function rotateToNextWeek() {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
   const currentWeek = s?.current_week || 1
@@ -231,9 +227,9 @@ export async function rotateToNextWeek() {
     .eq('week_number', currentWeek)
 
   if (ae) throw new Error('Failed to load assignments: ' + ae.message)
-  if (!currentAssigns?.length) throw new Error('No assignments found for current week. Assign tasks first.')
+  if (!currentAssigns?.length) throw new Error('No assignments found for current week.')
 
-  // Get members ordered by created_at (consistent order)
+  // ✅ SAME order as getMembers() — created_at ascending
   const { data: members, error: me } = await supabase
     .from('members')
     .select('id, name')
@@ -249,8 +245,8 @@ export async function rotateToNextWeek() {
 
   const memberIds = members.map(m => m.id)
 
-  // Rotate: member[i] gets task of member[i-1] (last member's task goes to first)
-  // Person 1 gets last person's task, Person 2 gets Person 1's task, etc.
+  // Rotate: member[i] gets the task of member[i-1]
+  // (last member's task wraps around to first member)
   const rows = memberIds.map((memberId, i) => {
     const fromMemberId = memberIds[(i - 1 + memberIds.length) % memberIds.length]
     return {
@@ -261,9 +257,9 @@ export async function rotateToNextWeek() {
     }
   }).filter(r => r.task_id)
 
-  if (!rows.length) throw new Error('Could not build rotation')
+  if (!rows.length) throw new Error('Could not build rotation — check all members have tasks assigned.')
 
-  // Bump week number
+  // Bump week number first
   await supabase.from('settings').update({ current_week: newWeek }).eq('id', 1)
 
   // Insert new week assignments
@@ -273,32 +269,27 @@ export async function rotateToNextWeek() {
   await supabase.from('logs').insert({
     action: `Rotated to Week ${newWeek}`,
     actor: 'Admin',
-    details: `${rows.length} tasks rotated (top to bottom)`
+    details: `${rows.length} tasks rotated`
   })
 
   return newWeek
 }
 
-// Delete a single assignment
 export async function deleteAssignment(assignmentId) {
   const { error } = await supabase.from('assignments').delete().eq('id', assignmentId)
   if (error) throw error
 }
 
-
-// Clear ALL assignments across all weeks
 export async function clearAllAssignments() {
   const { error } = await supabase.from('assignments').delete().gt('week_number', 0)
   if (error) throw error
 }
 
-// Clear only current week assignments
 export async function clearWeekAssignments(week) {
   const { error } = await supabase.from('assignments').delete().eq('week_number', week)
   if (error) throw error
 }
 
-// Reset done status only (keep assignments, just mark all as not done)
 export async function resetWeekDoneStatus(week) {
   const { error } = await supabase
     .from('assignments')
@@ -327,7 +318,6 @@ export async function updateSettings(updates) {
   if (error) throw error
 }
 
-// Check if current user is task assigner or admin
 export async function getMyRole(userId) {
   const { data, error } = await supabase
     .from('settings')
@@ -367,23 +357,19 @@ export async function getExpenses() {
 }
 
 export async function addExpense(title, amount, category, paidById, note, splitMemberIds) {
-  // Insert expense
   const { data: exp, error } = await supabase
     .from('expenses')
     .insert({ title, amount, category, paid_by: paidById, note })
     .select().single()
   if (error) throw error
 
-  // Calculate each person's share
   const share = Math.round((amount / splitMemberIds.length) * 100) / 100
   const splits = splitMemberIds.map((mid, i) => ({
     expense_id: exp.id,
     member_id:  mid,
-    // Give any rounding remainder to the last person
     amount: i === splitMemberIds.length - 1
       ? Math.round((amount - share * (splitMemberIds.length - 1)) * 100) / 100
       : share,
-    // Person who paid is already "paid" for their own share
     paid: mid === paidById,
     paid_at: mid === paidById ? new Date().toISOString() : null,
   }))
@@ -414,18 +400,15 @@ export async function deleteExpense(expenseId) {
   if (error) throw error
 }
 
-// Calculate who owes whom (simplified debt algorithm)
 export function calcDebts(expenses) {
-  // net[memberId] = positive means they are owed money, negative means they owe
   const net = {}
 
   expenses.forEach(exp => {
     exp.expense_splits?.forEach(split => {
       const mid = split.member_id
       if (!net[mid]) net[mid] = { id: mid, name: split.member?.name, avatar: split.member?.avatar, color: split.member?.color, balance: 0 }
-      if (!split.paid) net[mid].balance -= split.amount  // they owe this much
+      if (!split.paid) net[mid].balance -= split.amount
     })
-    // The payer is owed the sum of all unpaid splits (excluding their own)
     const unpaidByOthers = exp.expense_splits?.filter(s => !s.paid && s.member_id !== exp.paid_by).reduce((sum, s) => sum + Number(s.amount), 0) || 0
     if (exp.paid_by) {
       if (!net[exp.paid_by]) net[exp.paid_by] = { id: exp.paid_by, name: exp.paid_by_member?.name, avatar: exp.paid_by_member?.avatar, color: exp.paid_by_member?.color, balance: 0 }
@@ -433,7 +416,6 @@ export function calcDebts(expenses) {
     }
   })
 
-  // Simplify: generate minimum transactions
   const creditors = Object.values(net).filter(m => m.balance > 0.01).sort((a,b) => b.balance - a.balance)
   const debtors   = Object.values(net).filter(m => m.balance < -0.01).sort((a,b) => a.balance - b.balance)
   const txns = []
