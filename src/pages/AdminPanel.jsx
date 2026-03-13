@@ -592,9 +592,69 @@ function WhatsAppTab({ members, assigns, week, toast }) {
 // ASSIGN TAB — with Auto-Rotate Timer
 // ==========================================
 function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate }) {
-  const approved    = members.filter(m => m.status === 'approved')
-  const activeTasks = tasks.filter(t => t.active)
-  const [taskMap,   setTaskMap]   = useState(() => {
+  const approvedBase = members.filter(m => m.status === 'approved')
+  const activeTasks  = tasks.filter(t => t.active)
+
+  // ── Member order — persisted in localStorage ──
+  const ORDER_KEY = 'maniyara_member_order'
+  const [orderedIds, setOrderedIds] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]')
+      // Merge: keep saved order, append any new members at the end
+      const known = saved.filter(id => approvedBase.find(m => m.id === id))
+      const newOnes = approvedBase.filter(m => !known.includes(m.id)).map(m => m.id)
+      return [...known, ...newOnes]
+    } catch { return approvedBase.map(m => m.id) }
+  })
+
+  // Keep orderedIds in sync if members prop changes (approval / removal)
+  useEffect(() => {
+    setOrderedIds(prev => {
+      const known  = prev.filter(id => approvedBase.find(m => m.id === id))
+      const newOnes = approvedBase.filter(m => !known.includes(m.id)).map(m => m.id)
+      return [...known, ...newOnes]
+    })
+  }, [members])
+
+  const approved = orderedIds.map(id => approvedBase.find(m => m.id === id)).filter(Boolean)
+
+  const persistOrder = (ids) => {
+    setOrderedIds(ids)
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)) } catch {}
+  }
+
+  const moveUp = (idx) => {
+    if (idx === 0) return
+    const next = [...orderedIds]
+    ;[next[idx-1], next[idx]] = [next[idx], next[idx-1]]
+    persistOrder(next)
+  }
+
+  const moveDown = (idx) => {
+    if (idx === orderedIds.length - 1) return
+    const next = [...orderedIds]
+    ;[next[idx], next[idx+1]] = [next[idx+1], next[idx]]
+    persistOrder(next)
+  }
+
+  // Drag state
+  const [dragIdx,   setDragIdx]   = useState(null)
+  const [dragOver,  setDragOver]  = useState(null)
+  const [reordering, setReordering] = useState(false)
+
+  const onDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }
+  const onDragEnter = (_, idx)  => setDragOver(idx)
+  const onDragEnd   = ()        => {
+    if (dragIdx !== null && dragOver !== null && dragIdx !== dragOver) {
+      const next = [...orderedIds]
+      const [moved] = next.splice(dragIdx, 1)
+      next.splice(dragOver, 0, moved)
+      persistOrder(next)
+    }
+    setDragIdx(null); setDragOver(null)
+  }
+
+  const [taskMap,    setTaskMap]   = useState(() => {
     const m = {}; assigns.forEach(a=>{ m[a.member_id||a.members?.id] = a.task_id||a.tasks?.id }); return m
   })
   const [savingAll,  setSavingAll]  = useState(false)
@@ -657,50 +717,139 @@ function AssignTab({ members, tasks, assigns, week, toast, onDone, onAutoRotate 
       {/* ── ROTATE SECTION ── */}
       <RotateSectionWithTimer week={week} onAutoRotate={onAutoRotate} rotationPreview={rotationPreview} allAssigned={allAssigned} />
 
-      <SecHead title="Assign Tasks"/>
-      <div style={{fontSize:11,color:'#6a7090',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
-        <span style={{width:8,height:8,borderRadius:'50%',background:'#7DF9AA',display:'inline-block',animation:'pulse 2s ease-in-out infinite'}}/>
-        Tasks auto-save when you select them
+      {/* ── ASSIGN HEADER ── */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <div>
+          <div style={{fontFamily:'Orbitron,monospace',fontSize:11,fontWeight:700,letterSpacing:1.5,color:'#7DF9AA',textTransform:'uppercase'}}>Assign Tasks</div>
+          <div style={{fontSize:11,color:'#6a7090',marginTop:3,display:'flex',alignItems:'center',gap:6}}>
+            <span style={{width:7,height:7,borderRadius:'50%',background:'#7DF9AA',display:'inline-block',animation:'pulse 2s ease-in-out infinite'}}/>
+            Auto-saves when you select
+          </div>
+        </div>
+        {/* Reorder toggle */}
+        <button onClick={()=>setReordering(r=>!r)} style={{
+          display:'flex',alignItems:'center',gap:6,
+          padding:'7px 13px',borderRadius:99,fontSize:12,fontWeight:700,cursor:'pointer',
+          fontFamily:'Rajdhani,sans-serif',letterSpacing:'.04em',
+          border: reordering ? '1px solid rgba(255,217,61,.4)' : '1px solid rgba(125,249,170,.2)',
+          background: reordering ? 'rgba(255,217,61,.1)' : 'rgba(125,249,170,.06)',
+          color: reordering ? '#FFD93D' : '#7DF9AA',
+          transition:'all .15s'
+        }}>
+          {reordering ? '✓ Done' : '⇅ Reorder'}
+        </button>
       </div>
 
+      {/* Reorder hint */}
+      {reordering && (
+        <div style={{
+          fontSize:11,color:'#6a5a20',background:'rgba(255,217,61,.06)',
+          border:'1px solid rgba(255,217,61,.15)',borderRadius:9,
+          padding:'7px 12px',marginBottom:10,
+          display:'flex',alignItems:'center',gap:7
+        }}>
+          <span style={{fontSize:14}}>☝️</span>
+          Drag rows or use ↑ ↓ buttons to set the rotation order. Order is saved automatically.
+        </div>
+      )}
+
       <div style={{background:'#0d0e1a',border:'1px solid rgba(125,249,170,.09)',borderRadius:13,padding:14,marginBottom:14}}>
-        {approved.map((m,i)=>{
-          const cur = assigns.find(a=>a.member_id===m.id||a.members?.id===m.id)
+        <style>{`
+          @keyframes rowSlide{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+          .assign-row{transition:background .15s,transform .12s,opacity .15s}
+          .assign-row.dragging{opacity:0.4;transform:scale(.98)}
+          .assign-row.drag-over{border-color:rgba(255,217,61,.4)!important;background:rgba(255,217,61,.04)!important}
+        `}</style>
+
+        {approved.map((m, i) => {
+          const cur      = assigns.find(a=>a.member_id===m.id||a.members?.id===m.id)
           const isSaving = autoSaving === m.id
+          const isDragging  = dragIdx === i
+          const isDragOver  = dragOver === i && dragIdx !== i
+
           return (
-            <div key={m.id} style={{marginBottom:12,paddingBottom:12,borderBottom:i<approved.length-1?'1px solid rgba(125,249,170,.06)':'none'}}>
+            <div
+              key={m.id}
+              className={`assign-row${isDragging?' dragging':''}${isDragOver?' drag-over':''}`}
+              draggable={reordering}
+              onDragStart={reordering ? e => onDragStart(e, i) : undefined}
+              onDragEnter={reordering ? () => onDragEnter(null, i) : undefined}
+              onDragOver={reordering ? e => e.preventDefault() : undefined}
+              onDragEnd={reordering ? onDragEnd : undefined}
+              style={{
+                marginBottom:10, paddingBottom:10,
+                borderBottom: i < approved.length-1 ? '1px solid rgba(125,249,170,.06)' : 'none',
+                borderRadius:8,
+                cursor: reordering ? 'grab' : 'default',
+              }}
+            >
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+
+                {/* Reorder controls */}
+                {reordering && (
+                  <div style={{display:'flex',flexDirection:'column',gap:2,flexShrink:0}}>
+                    <button onClick={()=>moveUp(i)} disabled={i===0}
+                      style={{width:22,height:22,borderRadius:5,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',color:i===0?'#2a3050':'#8890b0',cursor:i===0?'not-allowed':'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>▲</button>
+                    <button onClick={()=>moveDown(i)} disabled={i===approved.length-1}
+                      style={{width:22,height:22,borderRadius:5,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',color:i===approved.length-1?'#2a3050':'#8890b0',cursor:i===approved.length-1?'not-allowed':'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>▼</button>
+                  </div>
+                )}
+
+                {/* Position number */}
+                {reordering && (
+                  <div style={{
+                    width:22,height:22,borderRadius:'50%',flexShrink:0,
+                    background:'rgba(255,217,61,.08)',border:'1px solid rgba(255,217,61,.2)',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:10,fontWeight:700,color:'#FFD93D',fontFamily:'Orbitron,monospace'
+                  }}>{i+1}</div>
+                )}
+
                 <Avatar emoji={m.avatar} color={m.color} size={36}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:14}}>{m.name}</div>
                   {m.username&&<div style={{fontSize:11,color:'#4a5070'}}>@{m.username}</div>}
                 </div>
-                {isSaving ? (
+
+                {/* Drag handle hint */}
+                {reordering && (
+                  <div style={{fontSize:16,color:'#3a4060',flexShrink:0,cursor:'grab',padding:'0 4px'}}>⠿</div>
+                )}
+
+                {!reordering && (isSaving ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(77,150,255,.1)',border:'1px solid rgba(77,150,255,.25)',color:'#4D96FF'}}>💾 Saving...</div>
                 ) : cur ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,flexShrink:0,background:cur.done?'rgba(125,249,170,.1)':'rgba(255,217,61,.08)',border:`1px solid ${cur.done?'rgba(125,249,170,.25)':'rgba(255,217,61,.2)'}`,color:cur.done?'#7DF9AA':'#FFD93D'}}>{cur.done?'✅ Done':'⏳ Pending'}</div>
                 ) : taskMap[m.id] ? (
                   <div style={{fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:99,background:'rgba(125,249,170,.06)',border:'1px solid rgba(125,249,170,.15)',color:'#7DF9AA'}}>✓ Assigned</div>
-                ) : null}
+                ) : null)}
               </div>
-              <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                <select value={taskMap[m.id]||''} onChange={e=>autoSaveTask(m, e.target.value)} disabled={isSaving}
-                  style={{...inp,flex:1,padding:'10px 13px',opacity:isSaving?0.6:1,borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
-                  <option value="">— Pick a task —</option>
-                  {activeTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
-                </select>
-                {cur&&(
-                  <button onClick={async()=>{if(!confirm(`Remove ${m.name}'s task?`)) return;await deleteAssignment(cur.id);setTaskMap(p=>{const n={...p};delete n[m.id];return n});toast(`${m.name}'s task removed`,'warn');onDone()}}
-                    style={{padding:'10px 12px',borderRadius:9,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,flexShrink:0}}>🗑️</button>
-                )}
-              </div>
-              {cur?.tasks && <div style={{fontSize:11,color:'#4a5070',marginTop:5,paddingLeft:2}}>Current: <span style={{color:'#8890b0'}}>{cur.tasks?.emoji} {cur.tasks?.name}</span></div>}
+
+              {!reordering && (
+                <>
+                  <div style={{display:'flex',gap:7,alignItems:'center'}}>
+                    <select value={taskMap[m.id]||''} onChange={e=>autoSaveTask(m, e.target.value)} disabled={isSaving}
+                      style={{...inp,flex:1,padding:'10px 13px',opacity:isSaving?0.6:1,borderColor:taskMap[m.id]?'rgba(125,249,170,.3)':'rgba(255,107,107,.3)'}}>
+                      <option value="">— Pick a task —</option>
+                      {activeTasks.map(t=><option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
+                    </select>
+                    {cur && (
+                      <button onClick={async()=>{if(!confirm(`Remove ${m.name}'s task?`)) return;await deleteAssignment(cur.id);setTaskMap(p=>{const n={...p};delete n[m.id];return n});toast(`${m.name}'s task removed`,'warn');onDone()}}
+                        style={{padding:'10px 12px',borderRadius:9,border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.08)',color:'#FF6B6B',cursor:'pointer',fontSize:14,flexShrink:0}}>🗑️</button>
+                    )}
+                  </div>
+                  {cur?.tasks && <div style={{fontSize:11,color:'#4a5070',marginTop:5,paddingLeft:2}}>Current: <span style={{color:'#8890b0'}}>{cur.tasks?.emoji} {cur.tasks?.name}</span></div>}
+                </>
+              )}
             </div>
           )
         })}
-        <div style={{borderTop:'1px solid rgba(125,249,170,.08)',paddingTop:12,marginTop:4}}>
-          <Btn full loading={savingAll} onClick={saveAll} style={{padding:13,fontSize:14}}>💾 Save ALL for Week {week}</Btn>
-        </div>
+
+        {!reordering && (
+          <div style={{borderTop:'1px solid rgba(125,249,170,.08)',paddingTop:12,marginTop:4}}>
+            <Btn full loading={savingAll} onClick={saveAll} style={{padding:13,fontSize:14}}>💾 Save ALL for Week {week}</Btn>
+          </div>
+        )}
       </div>
 
       <SecHead title="Delete Options"/>
