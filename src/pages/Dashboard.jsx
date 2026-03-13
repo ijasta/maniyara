@@ -357,8 +357,8 @@ function DashContent() {
 
       {/* Member cards grid */}
       {filtered.length===0 ? (
-        <div style={{textAlign:'center',padding:'48px 20px',animation:'fadeUp .3s ease'}}>
-          <div style={{fontSize:36,marginBottom:12}}>🎉</div>
+        <div style={{textAlign:'center',padding:'40px 20px',animation:'fadeUp .3s ease'}}>
+          <div style={{fontSize:32,marginBottom:10}}>🎉</div>
           <div style={{fontSize:13,fontWeight:600,color:T.t2,marginBottom:4}}>All clear</div>
           <div style={{fontSize:12,color:T.t3}}>
             {filter==='pending'?'Everyone completed their task!':'No members found.'}
@@ -370,134 +370,104 @@ function DashContent() {
             const a      = assigns.find(x => x.member_id===m.id || x.members?.id===m.id)
             const t      = a?.tasks
             const isDone = a?.done
-            // member's personal color for accent — fallback to green/red
             const mColor = m.color || (isDone ? T.green : T.purple)
 
             return (
               <div key={m.id}
                 className={`member-card ${isDone ? 'mc-done' : 'mc-pend'}`}
-                style={{animationDelay:`${idx * .05}s`}}
+                style={{animationDelay:`${idx*.05}s`}}
               >
-                {/* Top colour wash — uses member's own colour */}
+                {/* Colour wash — thin, top only */}
                 <div style={{
-                  position:'absolute', top:0, left:0, right:0, height:72,
-                  background:`linear-gradient(160deg, ${mColor}22 0%, transparent 100%)`,
-                  pointerEvents:'none'
+                  position:'absolute',top:0,left:0,right:0,height:3,
+                  background: isDone
+                    ? `linear-gradient(90deg,${T.green},rgba(52,211,153,.2))`
+                    : `linear-gradient(90deg,${mColor},rgba(0,0,0,0))`,
+                  opacity:.9
                 }}/>
 
-                {/* Done shimmer overlay */}
-                {isDone && (
-                  <div style={{
-                    position:'absolute', inset:0, pointerEvents:'none',
-                    background:'linear-gradient(160deg,rgba(52,211,153,.05) 0%,transparent 60%)'
-                  }}/>
-                )}
+                <div style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:12}}>
 
-                {/* Card body */}
-                <div style={{position:'relative', padding:'18px 14px 14px', display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
-
-                  {/* Avatar with status ring */}
-                  <div style={{position:'relative'}}>
+                  {/* Avatar — compact */}
+                  <div style={{position:'relative',flexShrink:0}}>
                     <div style={{
-                      width:60, height:60, borderRadius:'50%',
-                      background: `${mColor}20`,
-                      border: `2px solid ${isDone ? T.green : mColor}55`,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize:28,
-                      boxShadow: isDone ? `0 0 16px ${T.green}30` : `0 0 12px ${mColor}20`
-                    }}>
-                      {m.avatar || '👤'}
-                    </div>
+                      width:44,height:44,borderRadius:'50%',
+                      background:`${mColor}18`,
+                      border:`2px solid ${isDone ? T.green+'66' : mColor+'44'}`,
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:22
+                    }}>{m.avatar||'👤'}</div>
 
-                    {/* Done checkmark badge */}
-                    {isDone && (
-                      <div className="check-badge" style={{
-                        position:'absolute', bottom:-1, right:-1,
-                        width:20, height:20, borderRadius:'50%',
-                        background: T.green,
-                        border: `2.5px solid ${T.surface}`,
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:9, color:'#030a07', fontWeight:900
-                      }}>✓</div>
-                    )}
+                    {/* Status dot */}
+                    <div style={{
+                      position:'absolute',bottom:0,right:0,
+                      width:14,height:14,borderRadius:'50%',
+                      background: isDone ? T.green : T.red,
+                      border:`2px solid ${T.surface}`,
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:7,fontWeight:900,color:'#000'
+                    }}>{isDone ? '✓' : '!'}</div>
+                  </div>
 
-                    {/* Pending indicator */}
-                    {!isDone && a && (
+                  {/* Info — name + task in one column */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{
+                      fontSize:13,fontWeight:700,color:T.t1,
+                      marginBottom:5,
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
+                    }}>{m.name}</div>
+
+                    {t ? (
                       <div style={{
-                        position:'absolute', bottom:-1, right:-1,
-                        width:20, height:20, borderRadius:'50%',
-                        background: T.red,
-                        border: `2.5px solid ${T.surface}`,
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:9
-                      }}>⏳</div>
+                        display:'flex',alignItems:'center',gap:6,
+                        padding:'4px 10px',borderRadius:8,
+                        background: isDone ? T.greenDim : 'rgba(255,255,255,.04)',
+                        border:`1px solid ${isDone ? T.greenBdr : T.border}`,
+                      }}>
+                        <span style={{fontSize:13,flexShrink:0,lineHeight:1}}>{t.emoji}</span>
+                        <span style={{
+                          fontSize:11,fontWeight:600,
+                          color: isDone ? T.green : T.t2,
+                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
+                        }}>{t.name}</span>
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding:'4px 10px',borderRadius:8,
+                        background:'rgba(255,255,255,.03)',border:`1px solid ${T.border}`,
+                        fontSize:11,color:T.t4,fontStyle:'italic'
+                      }}>Unassigned</div>
                     )}
                   </div>
 
-                  {/* Name */}
-                  <div style={{
-                    fontSize:13, fontWeight:700, color: T.t1,
-                    textAlign:'center', lineHeight:1.2,
-                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                    width:'100%'
-                  }}>{m.name}</div>
-
-                  {/* Task badge */}
-                  {t ? (
+                  {/* Right side — status + proof */}
+                  <div style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
                     <div style={{
-                      display:'flex', alignItems:'center', gap:5,
-                      padding:'5px 10px', borderRadius:9999,
-                      background: isDone ? T.greenDim : 'rgba(255,255,255,.05)',
-                      border: `1px solid ${isDone ? T.greenBdr : T.border}`,
-                      width:'100%', minWidth:0
-                    }}>
-                      <span style={{fontSize:14, flexShrink:0}}>{t.emoji}</span>
-                      <span style={{
-                        fontSize:11, fontWeight:600,
-                        color: isDone ? T.green : T.t2,
-                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
-                      }}>{t.name}</span>
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding:'5px 10px', borderRadius:9999,
-                      background:'rgba(255,255,255,.03)',
-                      border:`1px solid ${T.border}`,
-                      fontSize:11, color:T.t4, fontStyle:'italic',
-                      width:'100%', textAlign:'center'
-                    }}>Unassigned</div>
-                  )}
+                      fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:6,
+                      background: isDone ? T.greenDim : T.redDim,
+                      border:`1px solid ${isDone ? T.greenBdr : T.redBdr}`,
+                      color: isDone ? T.green : T.red,
+                      letterSpacing:.02
+                    }}>{isDone ? 'Done' : 'Pending'}</div>
 
-                  {/* Status pill */}
-                  <div style={{
-                    display:'flex', alignItems:'center', justifyContent:'space-between',
-                    width:'100%', gap:6
-                  }}>
-                    <div className={`chip ${isDone ? 'chip-done' : 'chip-pend'}`}
-                      style={{fontSize:10, fontWeight:700, flex:1, justifyContent:'center'}}>
-                      {isDone ? '✓ Done' : '· Pending'}
-                    </div>
-
-                    {/* Proof button */}
                     {a?.proof_url && (
                       <button onClick={()=>openPhoto(a.proof_url)} style={{
-                        flexShrink:0, padding:'4px 8px', borderRadius:9999,
-                        background: T.greenDim, border:`1px solid ${T.greenBdr}`,
-                        color: T.green, fontSize:10, fontWeight:600,
-                        display:'flex', alignItems:'center', gap:3
+                        padding:'3px 8px',borderRadius:6,
+                        background:T.greenDim,border:`1px solid ${T.greenBdr}`,
+                        color:T.green,fontSize:10,fontWeight:600
                       }}>📷</button>
+                    )}
+
+                    {a?.done_at && (
+                      <div style={{
+                        fontSize:9,color:T.t4,
+                        fontFamily:'JetBrains Mono,monospace',textAlign:'right'
+                      }}>
+                        {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
+                      </div>
                     )}
                   </div>
 
-                  {/* Timestamp */}
-                  {a?.done_at && (
-                    <div style={{
-                      fontSize:10, color:T.t4, textAlign:'center',
-                      fontFamily:'JetBrains Mono,monospace'
-                    }}>
-                      {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
-                    </div>
-                  )}
                 </div>
               </div>
             )
