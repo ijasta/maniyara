@@ -386,82 +386,82 @@ function DashContent() {
                   opacity:.9
                 }}/>
 
-                <div style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:12}}>
+                <div style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:10}}>
 
                   {/* Avatar — compact */}
                   <div style={{position:'relative',flexShrink:0}}>
                     <div style={{
-                      width:44,height:44,borderRadius:'50%',
+                      width:40,height:40,borderRadius:'50%',
                       background:`${mColor}18`,
                       border:`2px solid ${isDone ? T.green+'66' : mColor+'44'}`,
                       display:'flex',alignItems:'center',justifyContent:'center',
-                      fontSize:22
+                      fontSize:20
                     }}>{m.avatar||'👤'}</div>
 
                     {/* Status dot */}
                     <div style={{
                       position:'absolute',bottom:0,right:0,
-                      width:14,height:14,borderRadius:'50%',
+                      width:13,height:13,borderRadius:'50%',
                       background: isDone ? T.green : T.red,
                       border:`2px solid ${T.surface}`,
                       display:'flex',alignItems:'center',justifyContent:'center',
-                      fontSize:7,fontWeight:900,color:'#000'
+                      fontSize:6,fontWeight:900,color:'#000'
                     }}>{isDone ? '✓' : '!'}</div>
                   </div>
 
-                  {/* Info — name + task in one column */}
+                  {/* Info — name + task */}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{
-                      fontSize:13,fontWeight:700,color:T.t1,
-                      marginBottom:5,
-                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
+                      fontSize:12,fontWeight:700,color:T.t1,
+                      marginBottom:5,lineHeight:1.2,
+                      wordBreak:'break-word'
                     }}>{m.name}</div>
 
                     {t ? (
                       <div style={{
-                        display:'flex',alignItems:'center',gap:6,
-                        padding:'4px 10px',borderRadius:8,
+                        display:'flex',alignItems:'center',gap:5,
+                        padding:'3px 8px',borderRadius:7,
                         background: isDone ? T.greenDim : 'rgba(255,255,255,.04)',
                         border:`1px solid ${isDone ? T.greenBdr : T.border}`,
                       }}>
-                        <span style={{fontSize:13,flexShrink:0,lineHeight:1}}>{t.emoji}</span>
+                        <span style={{fontSize:12,flexShrink:0,lineHeight:1}}>{t.emoji}</span>
                         <span style={{
-                          fontSize:11,fontWeight:600,
+                          fontSize:10,fontWeight:600,
                           color: isDone ? T.green : T.t2,
                           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
                         }}>{t.name}</span>
                       </div>
                     ) : (
                       <div style={{
-                        padding:'4px 10px',borderRadius:8,
+                        padding:'3px 8px',borderRadius:7,
                         background:'rgba(255,255,255,.03)',border:`1px solid ${T.border}`,
-                        fontSize:11,color:T.t4,fontStyle:'italic'
+                        fontSize:10,color:T.t4,fontStyle:'italic'
                       }}>Unassigned</div>
                     )}
                   </div>
 
-                  {/* Right side — status + proof */}
-                  <div style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                  {/* Right — status badge only (proof/time below) */}
+                  <div style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:5}}>
                     <div style={{
-                      fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:6,
+                      fontSize:9,fontWeight:700,padding:'3px 7px',borderRadius:6,
                       background: isDone ? T.greenDim : T.redDim,
                       border:`1px solid ${isDone ? T.greenBdr : T.redBdr}`,
                       color: isDone ? T.green : T.red,
-                      letterSpacing:.02
-                    }}>{isDone ? 'Done' : 'Pending'}</div>
+                      whiteSpace:'nowrap'
+                    }}>{isDone ? '✓ Done' : 'Pending'}</div>
 
                     {a?.proof_url && (
                       <button onClick={()=>openPhoto(a.proof_url)} style={{
-                        padding:'3px 8px',borderRadius:6,
+                        padding:'2px 7px',borderRadius:6,
                         background:T.greenDim,border:`1px solid ${T.greenBdr}`,
-                        color:T.green,fontSize:10,fontWeight:600
+                        color:T.green,fontSize:9,fontWeight:600
                       }}>📷</button>
                     )}
 
                     {a?.done_at && (
                       <div style={{
-                        fontSize:9,color:T.t4,
-                        fontFamily:'JetBrains Mono,monospace',textAlign:'right'
+                        fontSize:8,color:T.t4,
+                        fontFamily:'JetBrains Mono,monospace',textAlign:'right',lineHeight:1.3
                       }}>
                         {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
                       </div>
