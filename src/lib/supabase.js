@@ -73,12 +73,22 @@ export async function getMemberProfile(userId) {
   return data
 }
 
-// ✅ FIX: Use created_at order everywhere so screen and rotation always match
+// Orders by admin-set sort_order, falls back to created_at for new members
 export async function getMembers() {
   const { data, error } = await supabase
-    .from('members').select('*').order('created_at', { ascending: true })
+    .from('members').select('*')
+    .order('sort_order', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
   if (error) throw error
   return data
+}
+
+// Admin saves a new member order — writes sort_order to each member row
+export async function saveMemberOrder(orderedIds) {
+  const updates = orderedIds.map((id, i) =>
+    supabase.from('members').update({ sort_order: i }).eq('id', id)
+  )
+  await Promise.all(updates)
 }
 
 export async function getPendingMembers() {
@@ -213,8 +223,7 @@ export async function adminAssignTasks(assigns) {
   return week
 }
 
-// ✅ FIX: Both getMembers() and rotateToNextWeek() now use created_at order
-//         so the rotation always matches exactly what's shown on screen.
+// ✅ Uses sort_order (admin-defined) — same order as getMembers() and every page in the app
 export async function rotateToNextWeek() {
   const { data: s } = await supabase.from('settings').select('current_week').eq('id',1).single()
   const currentWeek = s?.current_week || 1
@@ -229,11 +238,12 @@ export async function rotateToNextWeek() {
   if (ae) throw new Error('Failed to load assignments: ' + ae.message)
   if (!currentAssigns?.length) throw new Error('No assignments found for current week.')
 
-  // ✅ SAME order as getMembers() — created_at ascending
+  // Use EXACT same order as getMembers() — sort_order then created_at
   const { data: members, error: me } = await supabase
     .from('members')
     .select('id, name')
     .eq('status', 'approved')
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true })
 
   if (me) throw new Error('Failed to load members')
@@ -246,7 +256,7 @@ export async function rotateToNextWeek() {
   const memberIds = members.map(m => m.id)
 
   // Rotate: member[i] gets the task of member[i-1]
-  // (last member's task wraps around to first member)
+  // Members STAY in their positions — only tasks move
   const rows = memberIds.map((memberId, i) => {
     const fromMemberId = memberIds[(i - 1 + memberIds.length) % memberIds.length]
     return {
@@ -269,7 +279,7 @@ export async function rotateToNextWeek() {
   await supabase.from('logs').insert({
     action: `Rotated to Week ${newWeek}`,
     actor: 'Admin',
-    details: `${rows.length} tasks rotated`
+    details: `${rows.length} tasks rotated (members stay, tasks shift)`
   })
 
   return newWeek
