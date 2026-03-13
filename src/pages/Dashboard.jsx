@@ -79,6 +79,36 @@ const CSS = `
   .row-card.is-done  { border-color: ${T.greenBdr}; }
   .row-card.is-pend  { border-color: ${T.redBdr}; }
 
+  /* ── Member grid cards ── */
+  .member-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .member-card {
+    border-radius: ${T.radius.lg}px;
+    border: 1px solid ${T.border};
+    background: ${T.surface};
+    overflow: hidden;
+    position: relative;
+    animation: fadeUp .35s ease both;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    cursor: default;
+  }
+  .member-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  .member-card.mc-done  { border-color: rgba(52,211,153,.2); }
+  .member-card.mc-pend  { border-color: rgba(248,113,113,.15); }
+
+  @keyframes shimmer {
+    0%   { transform: translateX(-100%) skewX(-12deg); }
+    100% { transform: translateX(220%) skewX(-12deg); }
+  }
+
   .chip {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 4px 10px; border-radius: ${T.radius.full}px;
@@ -116,9 +146,33 @@ const CSS = `
     letter-spacing: -1px;
   }
 
-  textarea { font-family: inherit; }
-  textarea:focus { outline: none; border-color: ${T.purpleBdr} !important; }
-  button { cursor: pointer; font-family: inherit; }
+  /* ── Member grid cards ── */
+  .member-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .member-card {
+    border-radius: ${T.radius.lg}px;
+    border: 1px solid ${T.border};
+    background: ${T.surface};
+    overflow: hidden;
+    position: relative;
+    animation: fadeUp .35s ease both;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .member-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0,0,0,.4);
+  }
+  .member-card.mc-done { border-color: rgba(52,211,153,.25); }
+  .member-card.mc-pend { border-color: rgba(248,113,113,.18); }
+
+  @keyframes checkPop { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  .check-badge { animation: checkPop .3s ease both; }
+
+
 
   .btn-primary {
     padding: 10px 20px; border-radius: ${T.radius.sm}px;
@@ -423,7 +477,7 @@ function DashContent() {
         </div>
       </div>
 
-      {/* Member rows */}
+      {/* Member cards grid */}
       {filtered.length===0 ? (
         <div style={{textAlign:'center',padding:'48px 20px',animation:'fadeUp .3s ease'}}>
           <div style={{fontSize:36,marginBottom:12}}>🎉</div>
@@ -432,78 +486,146 @@ function DashContent() {
             {filter==='pending'?'Everyone completed their task!':'No members found.'}
           </div>
         </div>
-      ) : filtered.map((m,idx) => {
-        const a    = assigns.find(x=>x.member_id===m.id||x.members?.id===m.id)
-        const t    = a?.tasks
-        const isDone = a?.done
+      ) : (
+        <div className="member-grid">
+          {filtered.map((m, idx) => {
+            const a      = assigns.find(x => x.member_id===m.id || x.members?.id===m.id)
+            const t      = a?.tasks
+            const isDone = a?.done
+            // member's personal color for accent — fallback to green/red
+            const mColor = m.color || (isDone ? T.green : T.purple)
 
-        return (
-          <div key={m.id} className={`row-card ${isDone?'is-done':'is-pend'}`}
-            style={{animationDelay:`${idx*.035}s`}}>
-
-            {/* Accent bar */}
-            <div style={{
-              position:'absolute',left:0,top:0,bottom:0,width:3,
-              background:isDone
-                ? `linear-gradient(180deg,${T.green},rgba(52,211,153,.1))`
-                : `linear-gradient(180deg,${T.red},rgba(248,113,113,.1))`,
-              borderRadius:'0 2px 2px 0'
-            }}/>
-
-            {/* Avatar */}
-            <div style={{position:'relative',flexShrink:0,marginLeft:4}}>
-              <Avatar emoji={m.avatar} color={m.color} size={40}/>
-              {isDone && (
+            return (
+              <div key={m.id}
+                className={`member-card ${isDone ? 'mc-done' : 'mc-pend'}`}
+                style={{animationDelay:`${idx * .05}s`}}
+              >
+                {/* Top colour wash — uses member's own colour */}
                 <div style={{
-                  position:'absolute',bottom:-2,right:-2,
-                  width:14,height:14,borderRadius:'50%',
-                  background:T.green,border:`2px solid ${T.surface}`,
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:7,color:'#030a07',fontWeight:900
-                }}>✓</div>
-              )}
-            </div>
+                  position:'absolute', top:0, left:0, right:0, height:72,
+                  background:`linear-gradient(160deg, ${mColor}22 0%, transparent 100%)`,
+                  pointerEvents:'none'
+                }}/>
 
-            {/* Info */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:600,color:T.t1,marginBottom:3,
-                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                {m.name}
-              </div>
-              {t ? (
-                <div className="chip" style={{maxWidth:'fit-content'}}>
-                  <span>{t.emoji}</span>
-                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:140}}>{t.name}</span>
-                </div>
-              ) : (
-                <span style={{fontSize:11,color:T.t4,fontStyle:'italic'}}>Unassigned</span>
-              )}
-              {(a?.done_at||a?.proof_url) && (
-                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
-                  {a.done_at && (
-                    <span style={{fontSize:10,color:T.t4}}>
-                      {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
-                    </span>
-                  )}
-                  {a.proof_url && (
-                    <button onClick={()=>openPhoto(a.proof_url)} style={{
-                      fontSize:10,color:T.green,fontWeight:600,background:'none',border:'none',
-                      padding:0,display:'flex',alignItems:'center',gap:3
+                {/* Done shimmer overlay */}
+                {isDone && (
+                  <div style={{
+                    position:'absolute', inset:0, pointerEvents:'none',
+                    background:'linear-gradient(160deg,rgba(52,211,153,.05) 0%,transparent 60%)'
+                  }}/>
+                )}
+
+                {/* Card body */}
+                <div style={{position:'relative', padding:'18px 14px 14px', display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
+
+                  {/* Avatar with status ring */}
+                  <div style={{position:'relative'}}>
+                    <div style={{
+                      width:60, height:60, borderRadius:'50%',
+                      background: `${mColor}20`,
+                      border: `2px solid ${isDone ? T.green : mColor}55`,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:28,
+                      boxShadow: isDone ? `0 0 16px ${T.green}30` : `0 0 12px ${mColor}20`
                     }}>
-                      View proof →
-                    </button>
+                      {m.avatar || '👤'}
+                    </div>
+
+                    {/* Done checkmark badge */}
+                    {isDone && (
+                      <div className="check-badge" style={{
+                        position:'absolute', bottom:-1, right:-1,
+                        width:20, height:20, borderRadius:'50%',
+                        background: T.green,
+                        border: `2.5px solid ${T.surface}`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:9, color:'#030a07', fontWeight:900
+                      }}>✓</div>
+                    )}
+
+                    {/* Pending indicator */}
+                    {!isDone && a && (
+                      <div style={{
+                        position:'absolute', bottom:-1, right:-1,
+                        width:20, height:20, borderRadius:'50%',
+                        background: T.red,
+                        border: `2.5px solid ${T.surface}`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:9
+                      }}>⏳</div>
+                    )}
+                  </div>
+
+                  {/* Name */}
+                  <div style={{
+                    fontSize:13, fontWeight:700, color: T.t1,
+                    textAlign:'center', lineHeight:1.2,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                    width:'100%'
+                  }}>{m.name}</div>
+
+                  {/* Task badge */}
+                  {t ? (
+                    <div style={{
+                      display:'flex', alignItems:'center', gap:5,
+                      padding:'5px 10px', borderRadius:T.radius.full,
+                      background: isDone ? T.greenDim : 'rgba(255,255,255,.05)',
+                      border: `1px solid ${isDone ? T.greenBdr : T.border}`,
+                      width:'100%', minWidth:0
+                    }}>
+                      <span style={{fontSize:14, flexShrink:0}}>{t.emoji}</span>
+                      <span style={{
+                        fontSize:11, fontWeight:600,
+                        color: isDone ? T.green : T.t2,
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+                      }}>{t.name}</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding:'5px 10px', borderRadius:T.radius.full,
+                      background:'rgba(255,255,255,.03)',
+                      border:`1px solid ${T.border}`,
+                      fontSize:11, color:T.t4, fontStyle:'italic',
+                      width:'100%', textAlign:'center'
+                    }}>Unassigned</div>
+                  )}
+
+                  {/* Status pill */}
+                  <div style={{
+                    display:'flex', alignItems:'center', justifyContent:'space-between',
+                    width:'100%', gap:6
+                  }}>
+                    <div className={`chip ${isDone ? 'chip-done' : 'chip-pend'}`}
+                      style={{fontSize:10, fontWeight:700, flex:1, justifyContent:'center'}}>
+                      {isDone ? '✓ Done' : '· Pending'}
+                    </div>
+
+                    {/* Proof button */}
+                    {a?.proof_url && (
+                      <button onClick={()=>openPhoto(a.proof_url)} style={{
+                        flexShrink:0, padding:'4px 8px', borderRadius:T.radius.full,
+                        background: T.greenDim, border:`1px solid ${T.greenBdr}`,
+                        color: T.green, fontSize:10, fontWeight:600,
+                        display:'flex', alignItems:'center', gap:3
+                      }}>📷</button>
+                    )}
+                  </div>
+
+                  {/* Timestamp */}
+                  {a?.done_at && (
+                    <div style={{
+                      fontSize:10, color:T.t4, textAlign:'center',
+                      fontFamily:'JetBrains Mono,monospace'
+                    }}>
+                      {new Date(a.done_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-
-            {/* Status chip */}
-            <div className={`chip ${isDone?'chip-done':'chip-pend'}`} style={{flexShrink:0,fontWeight:700,fontSize:11}}>
-              {isDone ? 'Done' : 'Pending'}
-            </div>
-          </div>
-        )
-      })}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ══════ COMPLAINTS ══════ */}
       <div className="divider">
