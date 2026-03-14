@@ -178,6 +178,7 @@ function DashContent() {
   const [cSubmit,    setCSub]     = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
   const [cSettings,  setCSt]     = useState(null)
+  const [adminOverride, setAdminOverride] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -236,15 +237,14 @@ function DashContent() {
     </div>
   )
 
-  // Maintenance gate — wait for profile to load before deciding
-  // Admins bypass via sessionStorage flag set by the override button
-  const overridden = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('maniyara_admin_override') === '1'
-  if (settings?.maintenance_mode && !overridden) {
+  // Maintenance gate — bypass with React state, no reload needed
+  if (settings?.maintenance_mode && !adminOverride) {
     return (
       <MaintenancePage
         message={settings?.maintenance_message}
         houseName={settings?.house_name || 'Maniyara'}
         isAdmin={!!profile?.is_admin}
+        onOverride={() => setAdminOverride(true)}
       />
     )
   }
