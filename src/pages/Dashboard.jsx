@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { getMembers, getCurrentAssignments, getSettings, supabase } from '../lib/supabase'
 import { Avatar, ToastProvider, useToast } from '../components/UI'
+import NotFound from './NotFound'
 
 const T = {
   bg:'#05060f', surface:'#0b0d1c', surfaceHi:'#10132a',
@@ -233,6 +234,11 @@ function DashContent() {
       <span style={{fontSize:11,color:T.t3,letterSpacing:2,fontFamily:'JetBrains Mono,monospace'}}>LOADING</span>
     </div>
   )
+
+  // Maintenance gate — non-admins see the 503 page
+  if (settings?.maintenance_mode && !profile?.is_admin) {
+    return <NotFound isMaintenance={true}/>
+  }
 
   const done    = assigns.filter(a=>a.done).length
   const pending = assigns.filter(a=>!a.done).length
