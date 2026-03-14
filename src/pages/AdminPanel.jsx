@@ -1,6 +1,5 @@
 import { useAutoRotateTimer } from './autoRotateTimer'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import NotFound from './NotFound'
 import { supabase,
   getMembers, getPendingMembers, approveMember, rejectMember, deleteMember, updateMember,
   saveMemberOrder,
@@ -1058,7 +1057,6 @@ function SiteControlsTab({ settings, toast, onDone }) {
     page_utility:        settings?.page_utility        ?? true,
   })
   const [saving, setSaving] = useState(false)
-  const [preview, setPreview] = useState(null) // null | '404' | 'maintenance'
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
   const save = async () => {
     setSaving(true)
@@ -1089,53 +1087,7 @@ function SiteControlsTab({ settings, toast, onDone }) {
         <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:6}}>Maintenance Message</label>
         <textarea value={form.maintenance_message} onChange={e=>set('maintenance_message',e.target.value)} rows={3} style={{...inp,width:'100%',resize:'vertical',fontSize:'14px',lineHeight:1.6}} placeholder="We are performing maintenance. Back soon! 🔧"/>
         {form.maintenance_mode&&<div style={{marginTop:10,padding:'9px 12px',borderRadius:8,background:'rgba(255,107,107,.1)',border:'1px solid rgba(255,107,107,.2)'}}><div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Site is in maintenance mode. Only admin can bypass it.</div></div>}
-        <div style={{marginTop:12,display:'flex',gap:8}}>
-          <button
-            onClick={()=>setPreview('404')}
-            style={{flex:1,padding:'9px 12px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'Rajdhani,sans-serif',letterSpacing:'.04em',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}
-          >🔍 Preview 404 Page</button>
-          <button
-            onClick={()=>setPreview('maintenance')}
-            style={{flex:1,padding:'9px 12px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'Rajdhani,sans-serif',letterSpacing:'.04em',border:'1px solid rgba(255,217,61,.2)',background:'rgba(255,217,61,.06)',color:'#FFD93D',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}
-          >🚧 Preview Maintenance</button>
-        </div>
       </div>
-
-      {/* ── Inline preview modal ── */}
-      {preview && (
-        <div onClick={()=>setPreview(null)} style={{
-          position:'fixed',inset:0,zIndex:9999,
-          background:'rgba(2,4,12,.92)',backdropFilter:'blur(8px)',
-          display:'flex',flexDirection:'column',
-          animation:'fadeIn .15s ease'
-        }}>
-          {/* Close bar */}
-          <div onClick={e=>e.stopPropagation()} style={{
-            display:'flex',alignItems:'center',justifyContent:'space-between',
-            padding:'10px 16px',
-            background:'rgba(255,255,255,.04)',
-            borderBottom:'1px solid rgba(255,255,255,.08)',
-            flexShrink:0
-          }}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:preview==='404'?'#FF6B6B':'#FFD93D'}}/>
-              <span style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.5)',fontFamily:'Rajdhani,sans-serif',letterSpacing:1}}>
-                ADMIN PREVIEW — {preview==='404' ? '404 NOT FOUND' : '503 MAINTENANCE'}
-              </span>
-            </div>
-            <button onClick={()=>setPreview(null)} style={{
-              padding:'5px 14px',borderRadius:7,fontSize:12,fontWeight:700,
-              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',
-              color:'rgba(255,255,255,.6)',cursor:'pointer',fontFamily:'Rajdhani,sans-serif'
-            }}>✕ Close Preview</button>
-          </div>
-          {/* Page preview */}
-          <div onClick={e=>e.stopPropagation()} style={{flex:1,overflow:'auto'}}>
-            <NotFound isMaintenance={preview==='maintenance'}/>
-          </div>
-        </div>
-      )}
-
       <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#7DF9AA',textTransform:'uppercase',marginBottom:12}}>📱 Page Visibility</div>
       <div style={{display:'flex',flexDirection:'column',gap:9,marginBottom:20}}>
         {PAGES.map(({key,label,desc})=>{
