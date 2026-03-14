@@ -243,7 +243,6 @@ function DashContent() {
       <MaintenancePage
         message={settings?.maintenance_message}
         houseName={settings?.house_name || 'Maniyara'}
-        isAdmin={!!profile?.is_admin}
         onOverride={() => setAdminOverride(true)}
       />
     )
