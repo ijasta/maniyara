@@ -96,6 +96,9 @@ export default function App() {
         <Route path="profile"  element={<Profile />} />
         <Route path="assign"   element={<Guard><TaskAssigner /></Guard>} />
         <Route path="admin"    element={<Guard adminOnly><AdminPanel onSettingsChange={()=>getSettings().then(setSiteSettings)}/></Guard>} />
+        <Route path="/404-preview"         element={<NotFound isMaintenance={false}/>}/>
+        <Route path="/maintenance-preview" element={<NotFound isMaintenance={true}/>}/>
+        <Route path="*"                    element={<NotFound/>}/>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
