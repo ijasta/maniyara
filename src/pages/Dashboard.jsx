@@ -235,9 +235,11 @@ function DashContent() {
     </div>
   )
 
-  // Maintenance gate — non-admins see the 503 page
-  if (settings?.maintenance_mode && !profile?.is_admin) {
-    return <NotFound isMaintenance={true}/>
+  // Maintenance gate — wait for profile to load before deciding
+  // Admins bypass via sessionStorage flag set by the override button
+  const overridden = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('maniyara_admin_override') === '1'
+  if (settings?.maintenance_mode && profile !== undefined && !profile?.is_admin && !overridden) {
+    return <NotFound isMaintenance={true} isAdmin={false} onOverride={null}/>
   }
 
   const done    = assigns.filter(a=>a.done).length
