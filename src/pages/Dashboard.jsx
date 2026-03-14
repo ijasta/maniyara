@@ -3,6 +3,7 @@ import { useAuth } from '../lib/AuthContext'
 import { getMembers, getCurrentAssignments, getSettings, supabase } from '../lib/supabase'
 import { Avatar, ToastProvider, useToast } from '../components/UI'
 import NotFound from './NotFound'
+import MaintenancePage from './MaintenancePage'
 
 const T = {
   bg:'#05060f', surface:'#0b0d1c', surfaceHi:'#10132a',
@@ -238,8 +239,14 @@ function DashContent() {
   // Maintenance gate — wait for profile to load before deciding
   // Admins bypass via sessionStorage flag set by the override button
   const overridden = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('maniyara_admin_override') === '1'
-  if (settings?.maintenance_mode && profile !== undefined && !profile?.is_admin && !overridden) {
-    return <NotFound isMaintenance={true} isAdmin={false} onOverride={null}/>
+  if (settings?.maintenance_mode && !overridden) {
+    return (
+      <MaintenancePage
+        message={settings?.maintenance_message}
+        houseName={settings?.house_name || 'Maniyara'}
+        isAdmin={!!profile?.is_admin}
+      />
+    )
   }
 
   const done    = assigns.filter(a=>a.done).length
