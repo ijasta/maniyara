@@ -115,7 +115,7 @@ function Particles() {
   )
 }
 
-export default function NotFound({ isMaintenance = false }) {
+export default function NotFound({ isMaintenance = false, isAdmin = false, onOverride = null }) {
   const [countdown, setCountdown] = useState(null)
   const [typed, setTyped] = useState('')
   const fullText = isMaintenance
@@ -325,6 +325,39 @@ export default function NotFound({ isMaintenance = false }) {
           >
             ← {isMaintenance ? 'RETRY CONNECTION' : 'GO HOME'}
           </a>
+
+          {/* Admin override — only shown to admins on maintenance page */}
+          {isMaintenance && onOverride && (
+            <button
+              onClick={onOverride}
+              style={{
+                marginTop:16,
+                display:'inline-flex', alignItems:'center', gap:8,
+                padding:'11px 24px', borderRadius:10,
+                background:'rgba(52,211,153,.08)',
+                border:'1px solid rgba(52,211,153,.3)',
+                color:'#34d399',
+                fontSize:12, fontWeight:700,
+                letterSpacing:.5,
+                cursor:'pointer',
+                transition:'all .2s',
+                animation:'fadeUp .5s .9s ease both', opacity:0,
+                fontFamily:"'Syne Mono', monospace",
+              }}
+              onMouseEnter={e=>{
+                e.currentTarget.style.background='rgba(52,211,153,.16)'
+                e.currentTarget.style.borderColor='rgba(52,211,153,.6)'
+                e.currentTarget.style.boxShadow='0 0 20px rgba(52,211,153,.2)'
+              }}
+              onMouseLeave={e=>{
+                e.currentTarget.style.background='rgba(52,211,153,.08)'
+                e.currentTarget.style.borderColor='rgba(52,211,153,.3)'
+                e.currentTarget.style.boxShadow='none'
+              }}
+            >
+              ⚡ ADMIN OVERRIDE — ENTER SITE
+            </button>
+          )}
 
           {/* Footer tag */}
           <div style={{
