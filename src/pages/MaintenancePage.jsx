@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+// MaintenancePage — no imports needed beyond JSX
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap');
@@ -215,14 +215,7 @@ function Gear({ size }) {
 }
 
 export default function MaintenancePage({ message, houseName = 'Maniyara', onOverride }) {
-  const [clicking, setClicking] = useState(false)
-
-  const handleOverride = () => {
-    if (!onOverride) return
-    setClicking(true)
-    setTimeout(() => onOverride(), 80)
-  }
-
+  const handleOverride = () => onOverride && onOverride()
   const handleRetry = () => window.location.reload()
 
   return (
@@ -269,11 +262,8 @@ export default function MaintenancePage({ message, houseName = 'Maniyara', onOve
         </button>
 
         {/* Admin override — always visible, onOverride wired only from Dashboard */}
-        <button className="btn-override" onClick={handleOverride} disabled={clicking}>
-          {clicking
-            ? <><span style={{display:'inline-block',animation:'spin-slow .6s linear infinite'}}>↺</span> Entering...</>
-            : <>⚡ Admin Override — Enter Site</>
-          }
+        <button className="btn-override" onClick={handleOverride}>
+          ⚡ Admin Override — Enter Site
         </button>
 
         <div className="footer">MANIYARA · {new Date().getFullYear()}</div>
