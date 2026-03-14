@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../lib/AuthContext'
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap');
@@ -215,19 +214,17 @@ function Gear({ size }) {
   )
 }
 
-export default function MaintenancePage({ message, houseName = 'Maniyara', isAdmin = false }) {
+export default function MaintenancePage({ message, houseName = 'Maniyara', isAdmin = false, onOverride }) {
   const [clicking, setClicking] = useState(false)
 
   const handleOverride = () => {
+    if (!onOverride) return
     setClicking(true)
-    // Store bypass flag — survives reload, clears when tab closes
-    sessionStorage.setItem('maniyara_admin_override', '1')
-    window.location.reload()
+    // Small delay so the button state renders before switching
+    setTimeout(() => onOverride(), 80)
   }
 
-  const handleRetry = () => {
-    window.location.reload()
-  }
+  const handleRetry = () => window.location.reload()
 
   return (
     <>
