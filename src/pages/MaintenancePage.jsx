@@ -214,13 +214,12 @@ function Gear({ size }) {
   )
 }
 
-export default function MaintenancePage({ message, houseName = 'Maniyara', isAdmin = false, onOverride }) {
+export default function MaintenancePage({ message, houseName = 'Maniyara', onOverride }) {
   const [clicking, setClicking] = useState(false)
 
   const handleOverride = () => {
     if (!onOverride) return
     setClicking(true)
-    // Small delay so the button state renders before switching
     setTimeout(() => onOverride(), 80)
   }
 
@@ -269,15 +268,13 @@ export default function MaintenancePage({ message, houseName = 'Maniyara', isAdm
           ↺ Retry Connection
         </button>
 
-        {/* Admin override — only shown to admins */}
-        {isAdmin && (
-          <button className="btn-override" onClick={handleOverride} disabled={clicking}>
-            {clicking
-              ? <><span style={{display:'inline-block',animation:'spin-slow .6s linear infinite'}}>↺</span> Entering...</>
-              : <>⚡ Admin Override — Enter Site</>
-            }
-          </button>
-        )}
+        {/* Admin override — always visible, onOverride wired only from Dashboard */}
+        <button className="btn-override" onClick={handleOverride} disabled={clicking}>
+          {clicking
+            ? <><span style={{display:'inline-block',animation:'spin-slow .6s linear infinite'}}>↺</span> Entering...</>
+            : <>⚡ Admin Override — Enter Site</>
+          }
+        </button>
 
         <div className="footer">MANIYARA · {new Date().getFullYear()}</div>
       </div>
