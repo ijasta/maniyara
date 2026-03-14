@@ -317,6 +317,7 @@ export async function swapTasks(memberId1, memberId2, week) {
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
+// DB: ALTER TABLE settings ADD COLUMN IF NOT EXISTS maintenance_mode boolean DEFAULT false;
 export async function getSettings() {
   const { data, error } = await supabase.from('settings').select('*').eq('id',1).single()
   if (error) throw error
