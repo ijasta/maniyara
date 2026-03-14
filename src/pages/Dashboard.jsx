@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { getMembers, getCurrentAssignments, getSettings, supabase } from '../lib/supabase'
 import { Avatar, ToastProvider, useToast } from '../components/UI'
-import NotFound from './NotFound'
-import MaintenancePage from './MaintenancePage'
 
 const T = {
   bg:'#05060f', surface:'#0b0d1c', surfaceHi:'#10132a',
@@ -178,7 +176,6 @@ function DashContent() {
   const [cSubmit,    setCSub]     = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
   const [cSettings,  setCSt]     = useState(null)
-  const [adminOverride, setAdminOverride] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -236,17 +233,6 @@ function DashContent() {
       <span style={{fontSize:11,color:T.t3,letterSpacing:2,fontFamily:'JetBrains Mono,monospace'}}>LOADING</span>
     </div>
   )
-
-  // Maintenance gate — bypass with React state, no reload needed
-  if (settings?.maintenance_mode && !adminOverride) {
-    return (
-      <MaintenancePage
-        message={settings?.maintenance_message}
-        houseName={settings?.house_name || 'Maniyara'}
-        onOverride={() => setAdminOverride(true)}
-      />
-    )
-  }
 
   const done    = assigns.filter(a=>a.done).length
   const pending = assigns.filter(a=>!a.done).length
