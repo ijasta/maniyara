@@ -1087,6 +1087,20 @@ function SiteControlsTab({ settings, toast, onDone }) {
         <label style={{display:'block',fontSize:10,fontWeight:700,color:'#4a5070',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:6}}>Maintenance Message</label>
         <textarea value={form.maintenance_message} onChange={e=>set('maintenance_message',e.target.value)} rows={3} style={{...inp,width:'100%',resize:'vertical',fontSize:'14px',lineHeight:1.6}} placeholder="We are performing maintenance. Back soon! 🔧"/>
         {form.maintenance_mode&&<div style={{marginTop:10,padding:'9px 12px',borderRadius:8,background:'rgba(255,107,107,.1)',border:'1px solid rgba(255,107,107,.2)'}}><div style={{fontSize:12,color:'#FF6B6B',fontWeight:700}}>⚠️ Site is in maintenance mode. Only admin can bypass it.</div></div>}
+        <div style={{marginTop:12,display:'flex',gap:8}}>
+          <button
+            onClick={()=>window.open('/404-preview','_blank')}
+            style={{flex:1,padding:'9px 12px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'Rajdhani,sans-serif',letterSpacing:'.04em',border:'1px solid rgba(255,107,107,.25)',background:'rgba(255,107,107,.07)',color:'#FF6B6B',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}
+          >
+            🔍 Preview 404 Page
+          </button>
+          <button
+            onClick={()=>window.open('/maintenance-preview','_blank')}
+            style={{flex:1,padding:'9px 12px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'Rajdhani,sans-serif',letterSpacing:'.04em',border:'1px solid rgba(255,217,61,.2)',background:'rgba(255,217,61,.06)',color:'#FFD93D',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}
+          >
+            🚧 Preview Maintenance
+          </button>
+        </div>
       </div>
       <div style={{fontFamily:'Orbitron,monospace',fontSize:10,fontWeight:700,letterSpacing:2,color:'#7DF9AA',textTransform:'uppercase',marginBottom:12}}>📱 Page Visibility</div>
       <div style={{display:'flex',flexDirection:'column',gap:9,marginBottom:20}}>
